@@ -17,15 +17,21 @@ export default function ContactPage() {
     setForm((f) => ({ ...f, [name]: value }))
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     try {
-      const key = "contact_submissions"
-      const prev = JSON.parse(localStorage.getItem(key) || "[]")
-      prev.push({ ...form, createdAt: new Date().toISOString() })
-      localStorage.setItem(key, JSON.stringify(prev))
-      setStatus("Thanks! We received your message.")
+      const Response = await fetch("/api/contact", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(form)
+      })
+
+      if(!Response.ok) {
+        setStatus("Something went wrong. Please try again.")
+      }
+
       setForm({ name: "", email: "", message: "" })
+      setStatus("Thanks! We received your message.")
     } catch {
       setStatus("Something went wrong. Please try again.")
     }

@@ -1,0 +1,18 @@
+import { NextResponse } from "next/server"
+
+export async function GET() {
+    try {
+        const backendRes = await fetch(`${process.env.BACKEND_URL}/contact`)
+        
+        if(!backendRes.ok) {
+            return NextResponse.json({ message: "Something went wrong" }, { status: backendRes.status })
+        }
+    
+        const data = await backendRes.json()
+        return NextResponse.json(data)
+    }
+    catch(err:any) {
+        console.error("Proxy error:", err);
+        return NextResponse.json({ message: "Server error" }, { status: 500 });
+    }
+}
