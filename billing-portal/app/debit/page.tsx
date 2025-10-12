@@ -2,6 +2,7 @@
 
 import { bills as billsApi, useStore } from "../../lib/store"
 import { useMemo, useState } from "react"
+import AuthGuard from "../../components/auth-guard"
 
 type Group = {
   name: string
@@ -31,43 +32,45 @@ export default function DebitBillsPage() {
   const overall = groups.reduce((acc, g) => acc + g.totalDue, 0)
 
   return (
-    <main className="max-w-3xl mx-auto p-6 space-y-6">
-      <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Debit Bills</h1>
-        <div className="text-sm">
-          Overall Due: <span className="text-danger font-semibold">{overall.toFixed(2)}</span>
-        </div>
-      </header>
+    <AuthGuard>
+      <main className="max-w-3xl mx-auto p-6 space-y-6">
+        <header className="flex items-center justify-between">
+          <h1 className="text-2xl font-semibold">Debit Bills</h1>
+          <div className="text-sm">
+            Overall Due: <span className="text-danger font-semibold">{overall.toFixed(2)}</span>
+          </div>
+        </header>
 
-      {groups.length === 0 ? (
-        <div className="text-sm text-gray-500">No due bills.</div>
-      ) : (
-        <ul className="space-y-3">
-          {groups.map((g) => (
-            <li key={g.name} className="border rounded">
-              <button
-                onClick={() => setOpen((s) => ({ ...s, [g.name]: !s[g.name] }))}
-                className="w-full flex items-center justify-between px-4 py-3"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="font-medium">{g.name}</span>
-                  <span className="text-xs px-2 py-0.5 rounded bg-gray-100">{g.count}</span>
-                </div>
-                <div className="text-danger font-semibold">{g.totalDue.toFixed(2)}</div>
-              </button>
+        {groups.length === 0 ? (
+          <div className="text-sm text-gray-500">No due bills.</div>
+        ) : (
+          <ul className="space-y-3">
+            {groups.map((g) => (
+              <li key={g.name} className="border rounded">
+                <button
+                  onClick={() => setOpen((s) => ({ ...s, [g.name]: !s[g.name] }))}
+                  className="w-full flex items-center justify-between px-4 py-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="font-medium">{g.name}</span>
+                    <span className="text-xs px-2 py-0.5 rounded bg-gray-100">{g.count}</span>
+                  </div>
+                  <div className="text-danger font-semibold">{g.totalDue.toFixed(2)}</div>
+                </button>
 
-              {open[g.name] && (
-                <div className="border-t p-4 space-y-3">
-                  {g.bills.map((b) => (
-                    <BillRow key={b.id} billId={b.id} dueAmount={b.dueAmount} createdAt={b.createdAt} />
-                  ))}
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-    </main>
+                {open[g.name] && (
+                  <div className="border-t p-4 space-y-3">
+                    {g.bills.map((b) => (
+                      <BillRow key={b.id} billId={b.id} dueAmount={b.dueAmount} createdAt={b.createdAt} />
+                    ))}
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </main>
+    </AuthGuard>
   )
 }
 

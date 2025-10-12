@@ -1,7 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
 
 const LINKS = [
   { href: "/dashboard/products", label: "Products" },
@@ -11,6 +12,19 @@ const LINKS = [
 
 export default function Sidebar() {
   const pathname = usePathname()
+  const router = useRouter()
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+
+  useEffect(() => {
+    const token = localStorage.getItem("token")
+    setIsAuthenticated(!!token)
+  }, [])
+
+  const handleLogout = () => {
+    localStorage.removeItem("token")
+    router.replace("/login")
+  }
+
   return (
     <aside className="bg-white border-r">
       <div className="h-14 border-b px-4 flex items-center">
@@ -29,6 +43,14 @@ export default function Sidebar() {
             </Link>
           )
         })}
+        {isAuthenticated && (
+          <button
+            onClick={handleLogout}
+            className="px-3 py-2 rounded-md text-sm text-red-600 hover:bg-red-50 text-left"
+          >
+            Logout
+          </button>
+        )}
       </nav>
     </aside>
   )

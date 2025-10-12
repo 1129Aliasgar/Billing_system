@@ -1,36 +1,49 @@
 "use client"
 
 import type React from "react"
-
 import { useRouter } from "next/navigation"
-import { useActions, useStore } from "../../lib/store"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 
-export default function BillingLogin() {
+export default function BillingLoginPage() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const router = useRouter()
-  const loggedIn = useStore((s: any) => s.loggedIn)
-  const { login } = useActions()
 
-  useEffect(() => {
-    if (loggedIn) router.replace("/products")
-  }, [loggedIn, router])
-
-  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    const fd = new FormData(e.currentTarget)
-    const email = String(fd.get("email") || "")
-    const password = String(fd.get("password") || "")
-    if (email === "billing@demo.com" && password === "billing123") {
-      login()
+    setError("")
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Login failed")
+      }
+
+      const data = await response.json()
+      localStorage.setItem("token", data.token)
       router.replace("/products")
-    } else {
-      alert("Use billing@demo.com / billing123")
+
+    } catch (error: any) {
+      setError(error instanceof Error ? error.message : "An error occurred")
     }
   }
 
+  useEffect(() => {
+    const authed = localStorage.getItem("token") !== null
+    if (authed) router.replace("/products")
+  }, [router])
+
   return (
     <div className="min-h-dvh grid place-items-center p-6">
-      <form onSubmit={onSubmit} className="bg-white border rounded-lg p-6 w-full max-w-sm grid gap-4">
+      <form onSubmit={handleSubmit} className="bg-white border rounded-lg p-6 w-full max-w-sm grid gap-4">
         <h1 className="text-xl font-semibold">Billing Login</h1>
         <input
           className="h-10 px-3 rounded-md border bg-background"
@@ -38,6 +51,8 @@ export default function BillingLogin() {
           name="email"
           placeholder="Email"
           type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
         />
         <input
           className="h-10 px-3 rounded-md border bg-background"
@@ -45,9 +60,11 @@ export default function BillingLogin() {
           name="password"
           placeholder="Password"
           type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
         />
-        <button className="h-10 rounded-md bg-primary text-white">Sign In</button>
-        <p className="text-xs text-muted">Demo: billing@demo.com / billing123</p>
+        <button className="h-10 rounded-md bg-primary text-white" type="submit">Sign In</button>
+        <p className="text-xs text-red-500 text-center">{error}</p>
       </form>
     </div>
   )
