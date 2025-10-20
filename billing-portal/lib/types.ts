@@ -1,8 +1,18 @@
 export type Product = {
-  id: string
-  name: string
-  price: number
-}
+  _id: string;          
+  name: string;
+  description: string;
+  price: number;
+  inStock: number;
+  image?: string;
+  metadata?: {
+    color?: string[];
+    size?: string[];
+    brand?: string[];
+  };
+  ISBillingAvailable: boolean;
+};
+
 
 export type LineItem = {
   productId: string

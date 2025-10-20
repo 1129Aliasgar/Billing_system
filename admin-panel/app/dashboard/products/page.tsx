@@ -21,6 +21,8 @@ export default function ProductsList() {
   const [items, setItems] = useState<Product[]>([])
   const [loading, setLoading] = useState(false)
   const [savingId, setSavingId] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
 
   async function fetchProducts() {
     setLoading(true)
@@ -41,6 +43,20 @@ export default function ProductsList() {
     () => items.filter((p) => p.name.toLowerCase().includes(q.toLowerCase())),
     [items, q]
   )
+
+  const totalPages = Math.ceil(filtered.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const currentItems = filtered.slice(startIndex, endIndex)
+
+  const goToPage = (page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)))
+  }
+
+  // Reset to page 1 when search query changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [q])
 
   async function getFullProduct(id: string) {
     const res = await fetch(`/api/products/${id}`)
@@ -122,7 +138,7 @@ export default function ProductsList() {
           <div className="text-right pr-2">Product Name</div>
         </div>
         <ul className="divide-y">
-          {filtered.map((p) => (
+          {currentItems.map((p) => (
             <li key={p._id} className="grid grid-cols-4 items-center p-2 gap-2">
               <div>
                 <label className="inline-flex items-center gap-2 text-sm">
@@ -161,6 +177,39 @@ export default function ProductsList() {
           ))}
         </ul>
       </div>
+      
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 mt-4">
+          <button
+            onClick={() => goToPage(currentPage - 1)}
+            disabled={currentPage === 1}
+            className="px-3 py-2 rounded-md border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+          >
+            Previous
+          </button>
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+            <button
+              key={page}
+              onClick={() => goToPage(page)}
+              className={`px-3 py-2 rounded-md ${
+                currentPage === page
+                  ? "bg-primary text-white"
+                  : "border hover:bg-gray-50"
+              }`}
+            >
+              {page}
+            </button>
+          ))}
+          <button
+            onClick={() => goToPage(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            className="px-3 py-2 rounded-md border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+          >
+            Next
+          </button>
+        </div>
+      )}
+      
       {/* Modal rendered via CreateProductModal */}
     </section>
   )

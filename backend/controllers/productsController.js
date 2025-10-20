@@ -3,7 +3,7 @@ import Product from "../models/product.js"
 // CREATE Product
 export const createProduct = async (req, res) => {
   try {
-    const { name, description, price, inStock, image, HSN_code, metadata , IsVisible } = req.body;
+    const { name, description, price, inStock, image, HSN_code, metadata , IsVisible , ISBillingAvailable } = req.body;
 
     const product = await Product.create({
       name,
@@ -18,6 +18,7 @@ export const createProduct = async (req, res) => {
         brandvalues: metadata?.brandvalues ?? metadata?.brand ?? [],
       },
       IsVisible,
+      ISBillingAvailable,
     });
 
     if (!product) {
@@ -34,12 +35,13 @@ export const createProduct = async (req, res) => {
 export const getProducts = async (req, res) => {
   try {
     const onlyVisible = req.query?.visible === 'true'
-    const filter = onlyVisible ? { IsVisible: true } : {}
+    const billingOnly = req.query?.billing === 'true'
+    
+    let filter = {}
+    if (onlyVisible) filter.IsVisible = true
+    if (billingOnly) filter.ISBillingAvailable = true
+    
     const products = await Product.find(filter);
-
-    if (!products || products.length === 0) {
-      return res.status(404).json({ message: "No products found" });
-    }
 
     return res.status(200).json(products , { message: "Products fetched successfully" });
   } catch (err) {
@@ -51,7 +53,7 @@ export const getProducts = async (req, res) => {
 export const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, price, inStock, image, HSN_code, metadata , IsVisible } = req.body;
+    const { name, description, price, inStock, image, HSN_code, metadata , IsVisible , ISBillingAvailable } = req.body;
 
     const product = await Product.findByIdAndUpdate(
       id,
@@ -68,6 +70,7 @@ export const updateProduct = async (req, res) => {
           brandvalues: metadata?.brandvalues ?? metadata?.brand ?? [],
         },
         IsVisible,
+        ISBillingAvailable,
       },
       { new: true, runValidators: true }
     );

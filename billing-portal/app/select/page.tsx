@@ -1,18 +1,42 @@
 "use client"
 
 import { useActions, useStore } from "../../lib/store"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import AuthGuard from "../../components/auth-guard"
 
 export default function SelectPage() {
-  const products = useStore((s: any) => s.products)
+  const [products, setProducts] = useState<any[]>([])
   const { addItem } = useActions()
-  const [productId, setProductId] = useState<string>(products[0]?.id ?? "")
+  const [productId, setProductId] = useState<string>("")
   const [qty, setQty] = useState<number>(1)
 
+  async function fetchBillingProducts() {
+    try {
+      const res = await fetch("/api/products?billing=true", { cache: "no-store" })
+      const data = await res.json()
+      const billingProducts = Array.isArray(data) ? data : data?.products || []
+      setProducts(billingProducts)
+      if (billingProducts.length > 0 && !productId) {
+        setProductId(billingProducts[0]._id)
+      }
+    } catch (err) {
+      console.error("Error fetching billing products:", err)
+    }
+  }
+
+  useEffect(() => {
+    fetchBillingProducts()
+  }, [])
+
   function onAdd() {
-    const p = products.find((x: any) => x.id === productId)
-    if (p) addItem(p, qty)
+    const p = products.find((x: any) => x._id === productId)
+    if (p && qty <= p.inStock) addItem(p, qty)
+  }
+
+  function handleQtyChange(newQty: number) {
+    const p = products.find((x: any) => x._id === productId)
+    const maxQty = p ? p.inStock : 1
+    setQty(Math.min(Math.max(1, newQty), maxQty))
   }
 
   return (
@@ -28,7 +52,7 @@ export default function SelectPage() {
               onChange={(e) => setProductId(e.target.value)}
             >
               {products.map((p: any) => (
-                <option key={p.id} value={p.id}>
+                <option key={p._id} value={p._id}>
                   {p.name}
                 </option>
               ))}
@@ -40,8 +64,9 @@ export default function SelectPage() {
               className="h-10 px-3 rounded-md border bg-background"
               type="number"
               min={1}
+              max={products.find(p => p._id === productId)?.inStock || 1}
               value={qty}
-              onChange={(e) => setQty(Number(e.target.value))}
+              onChange={(e) => handleQtyChange(Number(e.target.value))}
             />
           </label>
           <div className="flex items-center gap-2">
@@ -50,7 +75,14 @@ export default function SelectPage() {
             </button>
           </div>
         </div>
-        <p className="text-sm text-muted">Added items will appear on the Billing page.</p>
+        <p className="text-sm text-muted">
+          Added items will appear on the Billing page. 
+          {products.find(p => p._id === productId) && (
+            <span className="block mt-1">
+              Available stock: {products.find(p => p._id === productId)?.inStock || 0}
+            </span>
+          )}
+        </p>
       </section>
     </AuthGuard>
   )

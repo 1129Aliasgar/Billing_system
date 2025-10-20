@@ -19,6 +19,9 @@ export default function ProductDetail() {
   const router = useRouter()
   const [p, setP] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
+  const [colorInput, setColorInput] = useState("")
+  const [sizeInput, setSizeInput] = useState("")
+  const [brandInput, setBrandInput] = useState("")
 
   async function load() {
     setLoading(true)
@@ -58,6 +61,38 @@ export default function ProductDetail() {
   async function del() {
     await fetch(`/api/products/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` } })
     router.push("/dashboard/products")
+  }
+
+  function handleMetadataAdd(type: "colorvalues" | "sizevalues" | "brandvalues", input: string, setInput: React.Dispatch<React.SetStateAction<string>>) {
+    if (input.trim() && p) {
+      const newValues = input.split(',').map(v => v.trim()).filter(v => v !== "");
+      setP((prev) => {
+        if (!prev) return null
+        return {
+          ...prev,
+          metadata: {
+            ...prev.metadata,
+            [type]: [...(prev.metadata?.[type] || []), ...newValues],
+          },
+        }
+      })
+      setInput("")
+    }
+  }
+
+  function handleMetadataRemove(type: "colorvalues" | "sizevalues" | "brandvalues", valueToRemove: string) {
+    if (p) {
+      setP((prev) => {
+        if (!prev) return null
+        return {
+          ...prev,
+          metadata: {
+            ...prev.metadata,
+            [type]: (prev.metadata?.[type] || []).filter((v) => v !== valueToRemove),
+          },
+        }
+      })
+    }
   }
 
   if (loading || !p) return <div>Loading...</div>
@@ -111,12 +146,94 @@ export default function ProductDetail() {
           </label>
         </div>
         <div>
-          <label className="block text-sm mb-1">Colors (comma separated)</label>
-          <input
-            className="input"
-            value={(p.metadata?.colorvalues || []).join(", ")}
-            onChange={(e) => setP({ ...p, metadata: { ...p.metadata, colorvalues: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) } })}
-          />
+          <label className="block text-sm mb-1">Colors (comma-separated or add one by one)</label>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={colorInput}
+              onChange={(e) => setColorInput(e.target.value)}
+              placeholder="Red, Blue, #FF00FF"
+              className="h-10 px-3 rounded-md border bg-background flex-1"
+            />
+            <button
+              type="button"
+              onClick={() => handleMetadataAdd("colorvalues", colorInput, setColorInput)}
+              className="h-10 px-3 rounded-md bg-gray-200 hover:bg-gray-300"
+            >
+              ✓
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2 mt-2">
+            {p.metadata?.colorvalues?.map((c, idx) => (
+              <span key={idx} className="flex items-center gap-1 px-2 py-1 rounded-full bg-gray-100 text-xs">
+                <span className="inline-block w-3 h-3 rounded-full border" style={{ backgroundColor: c }} />
+                {c}
+                <button type="button" onClick={() => handleMetadataRemove("colorvalues", c)} className="ml-1 text-red-500">
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm mb-1">Sizes (comma-separated or add one by one)</label>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={sizeInput}
+              onChange={(e) => setSizeInput(e.target.value)}
+              placeholder="S, M, L, XL"
+              className="h-10 px-3 rounded-md border bg-background flex-1"
+            />
+            <button
+              type="button"
+              onClick={() => handleMetadataAdd("sizevalues", sizeInput, setSizeInput)}
+              className="h-10 px-3 rounded-md bg-gray-200 hover:bg-gray-300"
+            >
+              ✓
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2 mt-2">
+            {p.metadata?.sizevalues?.map((s, idx) => (
+              <span key={idx} className="flex items-center gap-1 px-2 py-1 rounded-full bg-gray-100 text-xs">
+                {s}
+                <button type="button" onClick={() => handleMetadataRemove("sizevalues", s)} className="ml-1 text-red-500">
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm mb-1">Brands (comma-separated or add one by one)</label>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={brandInput}
+              onChange={(e) => setBrandInput(e.target.value)}
+              placeholder="BrandA, BrandB"
+              className="h-10 px-3 rounded-md border bg-background flex-1"
+            />
+            <button
+              type="button"
+              onClick={() => handleMetadataAdd("brandvalues", brandInput, setBrandInput)}
+              className="h-10 px-3 rounded-md bg-gray-200 hover:bg-gray-300"
+            >
+              ✓
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2 mt-2">
+            {p.metadata?.brandvalues?.map((b, idx) => (
+              <span key={idx} className="flex items-center gap-1 px-2 py-1 rounded-full bg-gray-100 text-xs">
+                {b}
+                <button type="button" onClick={() => handleMetadataRemove("brandvalues", b)} className="ml-1 text-red-500">
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
         </div>
         <div className="flex gap-2">
           <button className="btn" onClick={save}>

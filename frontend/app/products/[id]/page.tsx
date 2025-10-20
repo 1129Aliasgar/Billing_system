@@ -31,7 +31,7 @@ export default async function ProductDetails({ params }: { params: Promise<{ id:
       <div className="grid gap-4">
         <h1 className="text-2xl md:text-3xl font-bold">{productData.product.name}</h1>
         <p className="">{productData.product.discription || productData.product.description}</p>
-        <p className="text-lg font-semibold">${productData.product.price.toFixed(2)}</p>
+        <p className="text-lg font-semibold">₹{productData.product.price.toFixed(2)}</p>
         <p className="text-sm">In stock: {productData.product.inStock}</p>
         {Array.isArray(productData.product.metadata?.colorvalues) && productData.product.metadata.colorvalues.length > 0 && (
           <div className="flex items-center gap-2">

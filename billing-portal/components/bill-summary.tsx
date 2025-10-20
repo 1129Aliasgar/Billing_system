@@ -97,7 +97,7 @@ export default function BillSummary() {
                     const rate = typeof i.gstRate === "number" ? i.gstRate : bill.gst ? 18 : 0
                     const line = i.price * i.qty
                     const lineTotal = line + (rate / 100) * line
-                    return `$${lineTotal.toFixed(2)}`
+                    return `₹${lineTotal.toFixed(2)}`
                   })()}
                 </td>
                 <td className="p-2 text-right">
@@ -113,16 +113,16 @@ export default function BillSummary() {
 
       <div className="ml-auto grid gap-1 text-sm w-full max-w-xs">
         <div className="flex items-center justify-between">
-          <span className="text-muted">Subtotal</span>
-          <span>${subTotal.toFixed(2)}</span>
+          <span className="">Subtotal</span>
+          <span>₹{subTotal.toFixed(2)}</span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-muted">GST Total</span>
-          <span>${gstAmount.toFixed(2)}</span>
+          <span className="">GST Total</span>
+          <span>₹{gstAmount.toFixed(2)}</span>
         </div>
         <div className="flex items-center justify-between font-semibold border-t pt-2 mt-2">
           <span>Total</span>
-          <span>${grandTotal.toFixed(2)}</span>
+          <span>₹{grandTotal.toFixed(2)}</span>
         </div>
         <div className="flex items-center gap-2 mt-3">
           <button className="h-9 px-3 rounded-md bg-primary text-white" onClick={() => billsApi.saveDraft()}>

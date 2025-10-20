@@ -35,6 +35,10 @@ const productSchema = new mongoose.Schema({
         type: Boolean ,
         default: true
     },
+    ISBillingAvailable:{
+        type: Boolean ,
+        default: false
+    },
 })
 
 export default mongoose.model("products" , productSchema)
