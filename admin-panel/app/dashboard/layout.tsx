@@ -17,8 +17,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
+    // Only mark ready after we check the token to avoid flicker
+    const token = localStorage.getItem("token")
+    if (!token) {
+      router.replace("/login")
+      return
+    }
     setReady(true)
-    if (localStorage.getItem("admin_authed") !== "1") router.replace("/login")
   }, [router])
 
   if (!ready) return null

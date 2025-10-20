@@ -37,8 +37,10 @@ export default function LoginPage() {
   }
 
   useEffect(() => {
-    const authed = localStorage.getItem("token") !== null
-    if (authed) router.replace("/dashboard/products")
+    // Avoid double renders by only redirecting if token exists; do not set any state here
+    if (typeof window !== "undefined" && localStorage.getItem("token")) {
+      router.replace("/dashboard/products")
+    }
   }, [router])
 
   return (
