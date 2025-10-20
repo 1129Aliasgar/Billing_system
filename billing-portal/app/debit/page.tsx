@@ -13,7 +13,7 @@ type Group = {
 
 export default function DebitBillsPage() {
   const allBills = useStore((s) => s.bills)
-  const dueBills = allBills.filter((b) => b.status === "due" || b.dueAmount > 0)
+  const dueBills = allBills.filter((b:any) => b.status === "due" || b.dueAmount > 0)
 
   const groups = useMemo<Group[]>(() => {
     const map = new Map<string, Group>()

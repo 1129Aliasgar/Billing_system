@@ -26,7 +26,7 @@ export default function BillHistoryPage() {
                 </tr>
               </thead>
               <tbody>
-                {bills.map((b) => (
+                {bills.map((b:any) => (
                   <tr key={b.id} className="border-t">
                     <td className="px-3 py-2">{b.name}</td>
                     <td className="px-3 py-2">

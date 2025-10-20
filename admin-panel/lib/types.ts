@@ -1,8 +1,15 @@
 export type Product = {
-  id: string
+  _id: string
   name: string
+  discription?: string
   price: number
   inStock: number
-  description: string
-  createdAt: string
+  image: string
+  HSNC_code: string
+  metadata?: {
+    colorvalues?: string[]
+    sizevalues?: string[]
+    brandvalues?: string[]
+  }
+  IsVisible: boolean
 }

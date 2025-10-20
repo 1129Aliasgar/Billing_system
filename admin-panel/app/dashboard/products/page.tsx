@@ -3,64 +3,109 @@ import { useEffect, useMemo, useState } from "react"
 import type React from "react"
 
 import Link from "next/link"
+import CreateProductModal from "../../../components/create-product-modal"
 
-type Product = { id: string; name: string; price: number; inStock: number }
-
-function load(): Product[] {
-  if (typeof window === "undefined") return []
-  const existing = localStorage.getItem("admin_products")
-  if (existing) return JSON.parse(existing)
-  const seed: Product[] = [
-    { id: "p-1", name: "Wireless Headphones", price: 299900, inStock: 42 },
-    { id: "p-2", name: "Mechanical Keyboard", price: 499900, inStock: 18 },
-    { id: "p-3", name: "4K Monitor", price: 1999900, inStock: 7 },
-  ]
-  localStorage.setItem("admin_products", JSON.stringify(seed))
-  return seed
+type Product = {
+  _id: string
+  name: string
+  price: number
+  inStock: number
+  IsVisible: boolean
+  image?: string
+  HSNC_code?: string
+  metadata?: { colorvalues?: string[]; sizevalues?: string[]; brandvalues?: string[] }
 }
 
 export default function ProductsList() {
   const [q, setQ] = useState("")
   const [items, setItems] = useState<Product[]>([])
-  const [open, setOpen] = useState(false)
-  const [form, setForm] = useState({ name: "", price: "", inStock: "" })
+  const [loading, setLoading] = useState(false)
+  const [savingId, setSavingId] = useState<string | null>(null)
+
+  async function fetchProducts() {
+    setLoading(true)
+    try {
+      const res = await fetch("/api/products", { cache: "no-store" })
+      const data = await res.json()
+      setItems(Array.isArray(data) ? data : data?.products || [])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    setItems(load())
+    fetchProducts()
   }, [])
 
-  const filtered = useMemo(() => items.filter((p) => p.name.toLowerCase().includes(q.toLowerCase())), [items, q])
+  const filtered = useMemo(
+    () => items.filter((p) => p.name.toLowerCase().includes(q.toLowerCase())),
+    [items, q]
+  )
 
-  function save(next: Product[]) {
-    setItems(next)
-    localStorage.setItem("admin_products", JSON.stringify(next))
+  async function getFullProduct(id: string) {
+    const res = await fetch(`/api/products/${id}`)
+    if (!res.ok) return null
+    const data = await res.json()
+    return data?.product || data
   }
 
-  function updateStock(id: string, value: number) {
-    const next = items.map((p) => (p.id === id ? { ...p, inStock: value } : p))
-    save(next)
+  async function putProduct(id: string, body: any) {
+    const token = localStorage.getItem("token") || ""
+    const res = await fetch(`/api/products/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+    })
+    return res
   }
 
-  function createProduct(e: React.FormEvent) {
-    e.preventDefault()
-    const newP: Product = {
-      id: crypto.randomUUID(),
-      name: form.name,
-      price: Number(form.price || 0),
-      inStock: Number(form.inStock || 0),
+  async function toggleVisibility(id: string, next: boolean) {
+    const full = await getFullProduct(id)
+    if (!full) return
+    setSavingId(id)
+    try {
+      await putProduct(id, {
+        name: full.name,
+        description: full.discription ?? full.description ?? "",
+        price: full.price,
+        inStock: full.inStock,
+        image: full.image || "",
+        HSN_code: full.HSNC_code || full.HSN_code || "",
+        IsVisible: next,
+        metadata: full.metadata || {},
+      })
+      setItems((prev) => prev.map((p) => (p._id === id ? { ...p, IsVisible: next } : p)))
+    } finally {
+      setSavingId(null)
     }
-    save([newP, ...items])
-    setForm({ name: "", price: "", inStock: "" })
-    setOpen(false)
+  }
+
+  async function saveStock(id: string, nextStock: number) {
+    const full = await getFullProduct(id)
+    if (!full) return
+    setSavingId(id)
+    try {
+      await putProduct(id, {
+        name: full.name,
+        description: full.discription ?? full.description ?? "",
+        price: full.price,
+        inStock: nextStock,
+        image: full.image || "",
+        HSN_code: full.HSNC_code || full.HSN_code || "",
+        IsVisible: full.IsVisible,
+        metadata: full.metadata || {},
+      })
+      setItems((prev) => prev.map((p) => (p._id === id ? { ...p, inStock: nextStock } : p)))
+    } finally {
+      setSavingId(null)
+    }
   }
 
   return (
     <section className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-semibold">Products</h1>
-        <button className="btn" onClick={() => setOpen(true)}>
-          Create Product
-        </button>
+        <CreateProductModal />
       </div>
       <input
         className="input"
@@ -68,24 +113,47 @@ export default function ProductsList() {
         value={q}
         onChange={(e) => setQ(e.target.value)}
       />
+      {loading && <div className="text-sm text-gray-500">Loading…</div>}
       <div className="border rounded-lg overflow-hidden">
-        <div className="grid grid-cols-2 bg-[var(--color-muted)] text-sm font-medium p-2">
-          <div>In Stock (editable)</div>
+        <div className="grid grid-cols-4 bg-[var(--color-muted)] text-sm font-medium p-2">
+          <div>Visible</div>
+          <div>In Stock</div>
+          <div>Save</div>
           <div className="text-right pr-2">Product Name</div>
         </div>
         <ul className="divide-y">
           {filtered.map((p) => (
-            <li key={p.id} className="grid grid-cols-2 items-center p-2">
+            <li key={p._id} className="grid grid-cols-4 items-center p-2 gap-2">
+              <div>
+                <label className="inline-flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={p.IsVisible}
+                    disabled={savingId === p._id}
+                    onChange={(e) => toggleVisibility(p._id, e.target.checked)}
+                  />
+                  {p.IsVisible ? "Visible" : "Hidden"}
+                </label>
+              </div>
               <div>
                 <input
                   type="number"
-                  className="input max-w-24"
-                  value={p.inStock}
-                  onChange={(e) => updateStock(p.id, Number(e.target.value))}
+                  className="input max-w-28"
+                  defaultValue={p.inStock}
+                  onChange={(e) => setItems((prev) => prev.map((x) => (x._id === p._id ? { ...x, inStock: Number(e.target.value || 0) } : x)))}
                 />
               </div>
+              <div>
+                <button
+                  className="btn"
+                  disabled={savingId === p._id}
+                  onClick={() => saveStock(p._id, p.inStock)}
+                >
+                  {savingId === p._id ? "Saving…" : "Save"}
+                </button>
+              </div>
               <div className="text-right">
-                <Link href={`/dashboard/products/${p.id}`} className="text-[var(--color-primary)]">
+                <Link href={`/dashboard/products/${p._id}`} className="text-[var(--color-primary)]">
                   {p.name}
                 </Link>
               </div>
@@ -93,49 +161,7 @@ export default function ProductsList() {
           ))}
         </ul>
       </div>
-
-      {open && (
-        <div className="fixed inset-0 bg-black/30 grid place-items-center">
-          <form className="card w-full max-w-sm space-y-3" onSubmit={createProduct}>
-            <h2 className="text-lg font-semibold">Create Product</h2>
-            <div>
-              <label className="block text-sm mb-1">Name</label>
-              <input
-                className="input"
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm mb-1">Price (₹ paise)</label>
-              <input
-                type="number"
-                className="input"
-                value={form.price}
-                onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm mb-1">In Stock</label>
-              <input
-                type="number"
-                className="input"
-                value={form.inStock}
-                onChange={(e) => setForm((f) => ({ ...f, inStock: e.target.value }))}
-                required
-              />
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <button type="button" className="btn-outline px-3 py-2 rounded" onClick={() => setOpen(false)}>
-                Cancel
-              </button>
-              <button className="btn">Create</button>
-            </div>
-          </form>
-        </div>
-      )}
+      {/* Modal rendered via CreateProductModal */}
     </section>
   )
 }
