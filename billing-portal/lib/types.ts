@@ -26,4 +26,19 @@ export type Bill = {
   name: string
   items: LineItem[]
   gst: boolean
+  isDebit: boolean
+  debitAmount: number | null // null means full debit, number means partial debit
+}
+
+export type SavedBillStatus = "completed" | "due" | "draft"
+
+export type SavedBill = {
+  id: string // MongoDB _id for API calls
+  billId?: string // Custom billId (BLI00001) for display
+  name: string
+  items: (LineItem & { gstRate?: number })[]
+  total: number
+  dueAmount: number
+  status: SavedBillStatus
+  createdAt: string
 }

@@ -1,10 +1,50 @@
 "use client"
 
-import { useStore } from "../../lib/store"
+import { useStore, bills as billsApi } from "../../lib/store"
+import { useEffect, useState } from "react"
 import AuthGuard from "../../components/auth-guard"
+import type { SavedBill } from "../../lib/types"
 
 export default function BillHistoryPage() {
   const bills = useStore((s) => s.bills)
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+  const [editing, setEditing] = useState<string | null>(null)
+  const [editData, setEditData] = useState<any>(null)
+
+  useEffect(() => {
+    billsApi.fetchBills()
+  }, [])
+
+  const toggleExpand = (billId: string) => {
+    setExpanded((prev) => ({ ...prev, [billId]: !prev[billId] }))
+  }
+
+  const handleEdit = (bill: SavedBill) => {
+    setEditing(bill.id)
+    setEditData({
+      customerName: bill.name,
+      items: bill.items,
+    })
+  }
+
+  const handleDelete = async (billId: string) => {
+    if (!confirm("Are you sure you want to delete this bill? This action cannot be undone.")) {
+      return
+    }
+    await billsApi.deleteBill(billId)
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editing || !editData) return
+    await billsApi.updateBill(editing, editData)
+    setEditing(null)
+    setEditData(null)
+  }
+
+  const handleCancelEdit = () => {
+    setEditing(null)
+    setEditData(null)
+  }
 
   return (
     <AuthGuard>
@@ -13,43 +53,172 @@ export default function BillHistoryPage() {
         {bills.length === 0 ? (
           <div className="text-sm text-gray-500">No bills yet.</div>
         ) : (
-          <div className="overflow-x-auto border rounded">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="text-left px-3 py-2">Name</th>
-                  <th className="text-left px-3 py-2">Status</th>
-                  <th className="text-right px-3 py-2">Total</th>
-                  <th className="text-right px-3 py-2">Due</th>
-                  <th className="text-left px-3 py-2">Created</th>
-                  <th className="text-left px-3 py-2">ID</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bills.map((b:any) => (
-                  <tr key={b.id} className="border-t">
-                    <td className="px-3 py-2">{b.name}</td>
-                    <td className="px-3 py-2">
-                      <span
-                        className={
-                          b.status === "completed"
-                            ? "text-green-600"
-                            : b.status === "due"
-                              ? "text-danger"
-                              : "text-gray-600"
-                        }
+          <div className="space-y-3">
+            {bills.map((b: SavedBill) => (
+              <div key={b.id} className="border rounded-lg overflow-hidden">
+                <div className="bg-gray-50 p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4 flex-1">
+                      <button
+                        onClick={() => toggleExpand(b.id)}
+                        className="text-lg font-semibold hover:text-primary"
                       >
-                        {b.status}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-right">₹{b.total.toFixed(2)}</td>
-                    <td className="px-3 py-2 text-right">₹{b.dueAmount.toFixed(2)}</td>
-                    <td className="px-3 py-2">{new Date(b.createdAt).toLocaleString()}</td>
-                    <td className="px-3 py-2">{b.id}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                        {expanded[b.id] ? "▼" : "▶"}
+                      </button>
+                      <div className="flex-1 grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+                        <div>
+                          <div className="text-gray-600">Name</div>
+                          <div className="font-medium">{b.name}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-600">Status</div>
+                          <span
+                            className={
+                              b.status === "completed"
+                                ? "text-green-600 font-semibold"
+                                : b.status === "due"
+                                  ? "text-yellow-600 font-semibold"
+                                  : "text-gray-600"
+                            }
+                          >
+                            {b.status === "completed" ? "✓ Paid" : b.status === "due" ? "⚠ Debit" : b.status}
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-gray-600">Total</div>
+                          <div className="font-medium">₹{b.total.toFixed(2)}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-gray-600">Due</div>
+                          <div className="font-medium">₹{b.dueAmount.toFixed(2)}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-600">Bill ID</div>
+                          <div className="font-mono text-xs font-medium">{b.billId || b.id.slice(0, 8)}</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 ml-4">
+                      {editing !== b.id ? (
+                        <>
+                          <button
+                            onClick={() => handleEdit(b)}
+                            className="px-3 py-1.5 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDelete(b.id)}
+                            className="px-3 py-1.5 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200"
+                          >
+                            Delete
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={handleSaveEdit}
+                            className="px-3 py-1.5 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={handleCancelEdit}
+                            className="px-3 py-1.5 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-500 mt-2 ml-8">
+                    Created: {new Date(b.createdAt).toLocaleString()}
+                  </div>
+                </div>
+
+                {expanded[b.id] && (
+                  <div className="p-4 border-t bg-white">
+                    {editing === b.id ? (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Customer Name</label>
+                          <input
+                            type="text"
+                            value={editData.customerName}
+                            onChange={(e) => setEditData({ ...editData, customerName: e.target.value })}
+                            className="w-full px-3 py-2 border rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-2">Items</label>
+                          <div className="space-y-2">
+                            {editData.items.map((item: any, idx: number) => (
+                              <div key={idx} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
+                                <span className="flex-1">{item.name}</span>
+                                <span className="text-sm">Qty: {item.qty}</span>
+                                <span className="text-sm">Price: ₹{item.price}</span>
+                                <span className="text-sm font-medium">Total: ₹{(item.price * item.qty).toFixed(2)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div>
+                          <h3 className="text-sm font-semibold mb-2">Items ({b.items.length})</h3>
+                          <div className="overflow-x-auto">
+                            <table className="min-w-full text-sm">
+                              <thead className="bg-gray-50">
+                                <tr>
+                                  <th className="text-left px-2 py-1">Product</th>
+                                  <th className="text-right px-2 py-1">Price</th>
+                                  <th className="text-right px-2 py-1">Qty</th>
+                                  <th className="text-right px-2 py-1">GST %</th>
+                                  <th className="text-right px-2 py-1">Total</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {b.items.map((item, idx) => {
+                                  const gstRate = item.gstRate || 0
+                                  const lineTotal = item.price * item.qty
+                                  const gstAmount = (gstRate / 100) * lineTotal
+                                  const total = lineTotal + gstAmount
+                                  return (
+                                    <tr key={idx} className="border-t">
+                                      <td className="px-2 py-1">{item.name}</td>
+                                      <td className="px-2 py-1 text-right">₹{item.price.toFixed(2)}</td>
+                                      <td className="px-2 py-1 text-right">{item.qty}</td>
+                                      <td className="px-2 py-1 text-right">{gstRate}%</td>
+                                      <td className="px-2 py-1 text-right font-medium">₹{total.toFixed(2)}</td>
+                                    </tr>
+                                  )
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                        <div className="flex justify-end gap-4 pt-2 border-t">
+                          <div className="text-sm">
+                            <span className="text-gray-600">Subtotal: </span>
+                            <span className="font-medium">₹{(b.total - (b.items.reduce((sum, i) => sum + ((i.gstRate || 0) / 100) * i.price * i.qty, 0))).toFixed(2)}</span>
+                          </div>
+                          <div className="text-sm">
+                            <span className="text-gray-600">GST: </span>
+                            <span className="font-medium">₹{b.items.reduce((sum, i) => sum + ((i.gstRate || 0) / 100) * i.price * i.qty, 0).toFixed(2)}</span>
+                          </div>
+                          <div className="text-sm font-semibold">
+                            <span className="text-gray-600">Total: </span>
+                            <span>₹{b.total.toFixed(2)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
       </main>

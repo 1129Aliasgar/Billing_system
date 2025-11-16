@@ -1,27 +1,42 @@
 "use client"
 
 import { bills as billsApi, useStore } from "../../lib/store"
-import { useMemo, useState } from "react"
+import { useMemo, useState, useEffect } from "react"
 import AuthGuard from "../../components/auth-guard"
 
 type Group = {
   name: string
   count: number
   totalDue: number
-  bills: { id: string; dueAmount: number; createdAt: string; total: number }[]
+  bills: { id: string; billId?: string; dueAmount: number; createdAt: string; total: number }[]
 }
 
 export default function DebitBillsPage() {
   const allBills = useStore((s) => s.bills)
   const dueBills = allBills.filter((b:any) => b.status === "due" || b.dueAmount > 0)
 
+  useEffect(() => {
+    billsApi.fetchBills()
+  }, [])
+
   const groups = useMemo<Group[]>(() => {
     const map = new Map<string, Group>()
     for (const b of dueBills) {
-      const g = map.get(b.name) ?? { name: b.name, count: 0, totalDue: 0, bills: [] }
+      const g = map.get(b.name) ?? { 
+        name: b.name, 
+        count: 0, 
+        totalDue: 0, 
+        bills: [] as Group['bills'] 
+      }
       g.count += 1
       g.totalDue = Number((g.totalDue + b.dueAmount).toFixed(2))
-      g.bills.push({ id: b.id, dueAmount: b.dueAmount, createdAt: b.createdAt, total: b.total })
+      g.bills.push({ 
+        id: b.id, 
+        billId: b.billId, 
+        dueAmount: b.dueAmount, 
+        createdAt: b.createdAt, 
+        total: b.total 
+      })
       map.set(b.name, g)
     }
     return Array.from(map.values())
@@ -60,8 +75,14 @@ export default function DebitBillsPage() {
 
                 {open[g.name] && (
                   <div className="border-t p-4 space-y-3">
-                    {g.bills.map((b) => (
-                      <BillRow key={b.id} billId={b.id} dueAmount={b.dueAmount} createdAt={b.createdAt} />
+                    {g.bills.map((b: any) => (
+                      <BillRow 
+                        key={b.id} 
+                        billId={b.id} 
+                        dueAmount={b.dueAmount} 
+                        createdAt={b.createdAt}
+                        billCustomId={b.billId}
+                      />
                     ))}
                   </div>
                 )}
@@ -74,17 +95,30 @@ export default function DebitBillsPage() {
   )
 }
 
-function BillRow({ billId, dueAmount, createdAt }: { billId: string; dueAmount: number; createdAt: string }) {
+function BillRow({ billId, dueAmount, createdAt, billCustomId }: { billId: string; dueAmount: number; createdAt: string; billCustomId?: string }) {
   const [amount, setAmount] = useState<number>(0)
+  const [isUpdating, setIsUpdating] = useState(false)
+
+  const handlePayment = async () => {
+    if (amount <= 0) {
+      alert("Please enter a valid payment amount")
+      return
+    }
+    setIsUpdating(true)
+    await billsApi.payDue(billId, amount)
+    setAmount(0)
+    setIsUpdating(false)
+  }
+
   return (
     <div className="flex items-center justify-between gap-3">
       <div className="text-sm text-gray-600">
-        <div>Bill ID: {billId.slice(0, 6)}…</div>
+        <div>Bill ID: {billCustomId || billId.slice(0, 8)}</div>
         <div>Created: {new Date(createdAt).toLocaleString()}</div>
       </div>
       <div className="flex items-center gap-3">
         <div className="text-sm">
-          Due: <span className="text-danger font-semibold">{dueAmount.toFixed(2)}</span>
+          Due: <span className="text-danger font-semibold">₹{dueAmount.toFixed(2)}</span>
         </div>
         <input
           type="number"
@@ -92,14 +126,28 @@ function BillRow({ billId, dueAmount, createdAt }: { billId: string; dueAmount: 
           step="0.01"
           value={amount}
           onChange={(e) => setAmount(Math.max(0, Number(e.target.value || 0)))}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              handlePayment()
+            }
+          }}
           className="border rounded px-3 py-2 w-28 text-right"
           placeholder="Payment"
+          disabled={isUpdating}
         />
         <button
-          onClick={() => billsApi.payDue(billId, amount)}
-          className="px-3 py-2 bg-brand text-white rounded hover:opacity-90"
+          onClick={handlePayment}
+          disabled={isUpdating || amount <= 0}
+          className="px-3 py-2 bg-brand text-white rounded hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Apply Payment
+          {isUpdating ? "Updating..." : "Apply Payment"}
+        </button>
+        <button
+          onClick={handlePayment}
+          disabled={isUpdating || amount <= 0}
+          className="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          💾 Save
         </button>
       </div>
     </div>

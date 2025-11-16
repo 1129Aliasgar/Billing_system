@@ -1,13 +1,15 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { useActions, useStore } from "../lib/store"
-import { bills as billsApi } from "../lib/store" // use bills API for Save
+import { bills as billsApi } from "../lib/store"
 import type { LineItem } from "../lib/types"
 
 export default function BillSummary() {
   const bill = useStore((s: any) => s.bill)
-  const { updateQty, removeItem, toggleGST, setBillName, clearBill, setItemPrice, setItemGst } = useActions()
+  const { updateQty, removeItem, toggleGST, setBillName, clearBill, setItemPrice, setItemGst, toggleDebit, setDebitAmount } = useActions()
+  const [debitMode, setDebitMode] = useState<"full" | "partial">("full")
+  const [partialAmount, setPartialAmount] = useState<string>("")
 
   const { subTotal, gstAmount, grandTotal } = useMemo(() => {
     let sub = 0
@@ -21,6 +23,35 @@ export default function BillSummary() {
     const total = sub + gst
     return { subTotal: sub, gstAmount: gst, grandTotal: total }
   }, [bill])
+
+  const handleDebitToggle = (checked: boolean) => {
+    toggleDebit(checked)
+    if (!checked) {
+      setDebitAmount(null)
+      setDebitMode("full")
+      setPartialAmount("")
+    }
+  }
+
+  const handleDebitModeChange = (mode: "full" | "partial") => {
+    setDebitMode(mode)
+    if (mode === "full") {
+      setDebitAmount(null)
+      setPartialAmount("")
+    } else {
+      setPartialAmount("")
+    }
+  }
+
+  const handlePartialAmountChange = (value: string) => {
+    setPartialAmount(value)
+    const numValue = Number(value)
+    if (!isNaN(numValue) && numValue >= 0 && numValue <= grandTotal) {
+      setDebitAmount(numValue)
+    } else if (value === "") {
+      setDebitAmount(null)
+    }
+  }
 
   return (
     <div className="bg-white border rounded-lg p-4 grid gap-4">
@@ -56,7 +87,7 @@ export default function BillSummary() {
             {bill.items.length === 0 && (
               <tr>
                 <td colSpan={6} className="p-3 text-center text-muted">
-                  No items yet.
+                  No items yet. Add products from above.
                 </td>
               </tr>
             )}
@@ -101,7 +132,7 @@ export default function BillSummary() {
                   })()}
                 </td>
                 <td className="p-2 text-right">
-                  <button className="h-8 px-3 rounded-md border" onClick={() => removeItem(i.productId)}>
+                  <button className="h-8 px-3 rounded-md border hover:bg-gray-50" onClick={() => removeItem(i.productId)}>
                     Remove
                   </button>
                 </td>
@@ -111,26 +142,94 @@ export default function BillSummary() {
         </table>
       </div>
 
-      <div className="ml-auto grid gap-1 text-sm w-full max-w-xs">
-        <div className="flex items-center justify-between">
-          <span className="">Subtotal</span>
-          <span>₹{subTotal.toFixed(2)}</span>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Totals Section */}
+        <div className="ml-auto grid gap-1 text-sm w-full max-w-xs">
+          <div className="flex items-center justify-between">
+            <span className="">Subtotal</span>
+            <span>₹{subTotal.toFixed(2)}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="">GST Total</span>
+            <span>₹{gstAmount.toFixed(2)}</span>
+          </div>
+          <div className="flex items-center justify-between font-semibold border-t pt-2 mt-2">
+            <span>Total</span>
+            <span>₹{grandTotal.toFixed(2)}</span>
+          </div>
         </div>
-        <div className="flex items-center justify-between">
-          <span className="">GST Total</span>
-          <span>₹{gstAmount.toFixed(2)}</span>
-        </div>
-        <div className="flex items-center justify-between font-semibold border-t pt-2 mt-2">
-          <span>Total</span>
-          <span>₹{grandTotal.toFixed(2)}</span>
-        </div>
-        <div className="flex items-center gap-2 mt-3">
-          <button className="h-9 px-3 rounded-md bg-primary text-white" onClick={() => billsApi.saveDraft()}>
-            Save Bill
-          </button>
-          <button className="h-9 px-3 rounded-md border" onClick={clearBill}>
-            Clear
-          </button>
+
+        {/* Debit Section */}
+        <div className="border rounded-lg p-4 bg-gray-50">
+          <label className="flex items-center gap-2 text-sm font-medium mb-3">
+            <input 
+              type="checkbox" 
+              checked={bill.isDebit} 
+              onChange={(e) => handleDebitToggle(e.target.checked)}
+            />
+            <span>Mark as Debit</span>
+          </label>
+
+          {bill.isDebit && (
+            <div className="grid gap-3 mt-3">
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="debitMode"
+                    checked={debitMode === "full"}
+                    onChange={() => handleDebitModeChange("full")}
+                  />
+                  <span>Full Debit (₹{grandTotal.toFixed(2)})</span>
+                </label>
+              </div>
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="debitMode"
+                    checked={debitMode === "partial"}
+                    onChange={() => handleDebitModeChange("partial")}
+                  />
+                  <span>Partial Payment</span>
+                </label>
+              </div>
+
+              {debitMode === "partial" && (
+                <div className="grid gap-2">
+                  <label className="text-sm">
+                    Amount Paid:
+                    <input
+                      type="number"
+                      min={0}
+                      max={grandTotal}
+                      step="0.01"
+                      value={partialAmount}
+                      onChange={(e) => handlePartialAmountChange(e.target.value)}
+                      className="h-9 px-3 rounded-md border bg-white w-full mt-1"
+                      placeholder="Enter paid amount"
+                    />
+                  </label>
+                  {partialAmount && !isNaN(Number(partialAmount)) && Number(partialAmount) > 0 && (
+                    <div className="text-xs text-gray-600">
+                      Remaining: ₹{(grandTotal - Number(partialAmount)).toFixed(2)}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {bill.isDebit && (
+                <div className="text-xs text-gray-600 mt-2 p-2 bg-yellow-50 rounded">
+                  {debitMode === "full" 
+                    ? `Full amount (₹${grandTotal.toFixed(2)}) will be marked as debit.`
+                    : partialAmount && !isNaN(Number(partialAmount))
+                      ? `Paid: ₹${Number(partialAmount).toFixed(2)}, Debit: ₹${(grandTotal - Number(partialAmount)).toFixed(2)}`
+                      : "Enter the amount customer paid."
+                  }
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

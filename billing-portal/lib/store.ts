@@ -1,23 +1,13 @@
 "use client"
 
 import { useSyncExternalStore } from "react"
-import type { Product, Bill, LineItem, SavedBillStatus } from "./types"
+import type { Product, Bill, LineItem, SavedBillStatus, SavedBill } from "./types"
 
 // Keys for localStorage
 const K_PRODUCTS = "billing_products"
 const K_BILL = "billing_current_bill"
 const K_AUTH = "billing_logged_in"
 const K_BILLS = "billing_bills" // new: persisted bills list
-
-export type SavedBill = {
-  id: string
-  name: string
-  items: (LineItem & { gstRate?: number })[]
-  total: number
-  dueAmount: number
-  status: SavedBillStatus
-  createdAt: string
-}
 
 export type Store = {
   products: Product[]
@@ -27,15 +17,11 @@ export type Store = {
 }
 
 function defaultProducts(): Product[] {
-  return [
-    { id: "b-1", name: "Comfort Chair", price: 129.99 },
-    { id: "b-2", name: "Wooden Desk", price: 299.0 },
-    { id: "b-3", name: "LED Desk Lamp", price: 39.95 },
-  ]
+  return []
 }
 
 function defaultBill(): Bill {
-  return { id: "bill-1", name: "Untitled Bill", items: [], gst: false }
+  return { id: "bill-1", name: "Untitled Bill", items: [], gst: false, isDebit: false, debitAmount: null }
 }
 
 function lsGet<T>(key: string, fallback: T): T {
@@ -58,9 +44,9 @@ function lsSet<T>(key: string, value: T) {
 // In-memory state + listeners
 let state: Store =
   typeof window === "undefined"
-    ? { products: defaultProducts(), bill: defaultBill(), loggedIn: false, bills: [] }
+    ? { products: [], bill: defaultBill(), loggedIn: false, bills: [] }
     : {
-        products: lsGet<Product[]>(K_PRODUCTS, defaultProducts()),
+        products: lsGet<Product[]>(K_PRODUCTS, []),
         bill: lsGet<Bill>(K_BILL, defaultBill()),
         loggedIn: window.localStorage.getItem(K_AUTH) === "true",
         bills: lsGet<SavedBill[]>(K_BILLS, []), // new
@@ -129,60 +115,301 @@ function setItemGst(productId: string, gstRate: number) {
   })
 }
 
-// finalize current bill as completed/due or save draft
-function finalize(status: Exclude<SavedBillStatus, "draft">) {
-  const s = getSnapshot()
-  const id = `b-${Date.now()}`
-  const items = (s.bill.items as (LineItem & { gstRate?: number })[]) || []
-  const { total } = computeTotals(items)
-  const dueAmount = status === "due" ? total : 0
-  const rec: SavedBill = {
-    id,
-    name: s.bill.name || "Untitled Bill",
-    items,
-    total,
-    dueAmount,
-    status,
-    createdAt: new Date().toISOString(),
+// Helper to transform backend bill to SavedBill format
+function transformBackendBill(backendBill: any): SavedBill {
+  return {
+    id: backendBill._id || backendBill.billId, // Keep MongoDB _id for API calls
+    billId: backendBill.billId || backendBill._id, // Custom billId for display
+    name: backendBill.customerName || "Customer",
+    items: backendBill.items.map((item: any) => ({
+      productId: typeof item.productId === "object" ? item.productId._id : item.productId,
+      name: typeof item.productId === "object" ? item.productId.name : item.name,
+      price: item.price,
+      qty: item.quantity,
+      gstRate: item.gstRate || 0,
+    })),
+    total: backendBill.totalAmount,
+    dueAmount: backendBill.userDue,
+    status: backendBill.status as SavedBillStatus,
+    createdAt: backendBill.createdAt || new Date().toISOString(),
   }
-  setState({ ...s, bills: [...s.bills, rec], bill: defaultBill() })
 }
 
-function saveDraft() {
-  const s = getSnapshot()
-  const id = `d-${Date.now()}`
-  const items = (s.bill.items as (LineItem & { gstRate?: number })[]) || []
-  const { total } = computeTotals(items)
-  const rec: SavedBill = {
-    id,
-    name: s.bill.name || "Draft Bill",
-    items,
-    total,
-    dueAmount: total,
-    status: "draft",
-    createdAt: new Date().toISOString(),
+// Fetch bills from backend
+async function fetchBills() {
+  try {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
+    if (!token) return
+
+    const res = await fetch("/api/billing", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    if (res.ok) {
+      const data = await res.json()
+      const backendBills = data.bills || []
+      const transformedBills = backendBills.map(transformBackendBill)
+      const s = getSnapshot()
+      setState({ ...s, bills: transformedBills })
+    }
+  } catch (err) {
+    console.error("Error fetching bills:", err)
   }
-  setState({ ...s, bills: [...s.bills, rec] })
+}
+
+// finalize current bill as completed/due or save draft
+async function finalize(status: Exclude<SavedBillStatus, "draft">) {
+  const s = getSnapshot()
+  const items = (s.bill.items as (LineItem & { gstRate?: number })[]) || []
+  
+  if (items.length === 0) {
+    alert("Please add items to the bill")
+    return
+  }
+
+  try {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
+    if (!token) {
+      alert("Please login to create bills")
+      return
+    }
+
+    // Calculate GST
+    const hasGst = s.bill.gst
+    const gstPercent = hasGst ? 18 : 0
+    const { total } = computeTotals(items)
+    
+    // Determine if this is a debit bill based on status or bill.isDebit
+    const isDebit = status === "due" || s.bill.isDebit
+
+    // Prepare items for backend
+    const backendItems = items.map((item) => ({
+      productId: item.productId,
+      name: item.name,
+      price: item.price,
+      quantity: item.qty,
+      gstRate: item.gstRate || (hasGst ? gstPercent : 0),
+    }))
+
+    const res = await fetch("/api/billing", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        customerName: s.bill.name || "Customer",
+        items: backendItems,
+        gst: hasGst,
+        gstPercent,
+        isDebit,
+      }),
+    })
+
+    if (res.ok) {
+      const data = await res.json()
+      // Clear current bill and refresh bills list
+      setState({ ...s, bill: defaultBill() })
+      await fetchBills()
+      alert("Bill created successfully!")
+    } else {
+      const error = await res.json()
+      alert(error.message || "Failed to create bill")
+    }
+  } catch (err) {
+    console.error("Error creating bill:", err)
+    alert("Failed to create bill. Please try again.")
+  }
+}
+
+async function saveBill() {
+  // Save bill - if debit is checked, create as debit bill
+  const s = getSnapshot()
+  const items = (s.bill.items as (LineItem & { gstRate?: number })[]) || []
+  
+  if (items.length === 0) {
+    alert("Please add items to the bill")
+    return
+  }
+
+  try {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
+    if (!token) {
+      alert("Please login to create bills")
+      return
+    }
+
+    // Calculate GST
+    const hasGst = s.bill.gst
+    const gstPercent = hasGst ? 18 : 0
+    const { total } = computeTotals(items)
+    
+    // Determine debit status and amount
+    const isDebit = s.bill.isDebit
+    let userPaid = total
+    let userDue = 0
+    
+    if (isDebit) {
+      // If debitAmount is null, it means full debit
+      // If debitAmount is a number, it means partial payment was made
+      if (s.bill.debitAmount === null) {
+        // Full debit
+        userPaid = 0
+        userDue = total
+      } else {
+        // Partial payment
+        userPaid = s.bill.debitAmount
+        userDue = total - s.bill.debitAmount
+      }
+    }
+
+    // Prepare items for backend
+    const backendItems = items.map((item) => ({
+      productId: item.productId,
+      name: item.name,
+      price: item.price,
+      quantity: item.qty,
+      gstRate: item.gstRate || (hasGst ? gstPercent : 0),
+    }))
+
+    const res = await fetch("/api/billing", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        customerName: s.bill.name || "Customer",
+        items: backendItems,
+        gst: hasGst,
+        gstPercent,
+        isDebit,
+        userPaid, // Send the paid amount
+        userDue,  // Send the due amount
+      }),
+    })
+
+    if (res.ok) {
+      const data = await res.json()
+      // Clear current bill and refresh bills list
+      setState({ ...s, bill: defaultBill() })
+      await fetchBills()
+      alert("Bill saved successfully!")
+    } else {
+      const error = await res.json()
+      alert(error.message || "Failed to save bill")
+    }
+  } catch (err) {
+    console.error("Error saving bill:", err)
+    alert("Failed to save bill. Please try again.")
+  }
 }
 
 // pay partial due amount and update status
-function payDue(billId: string, amount: number) {
-  if (!amount || amount <= 0) return
-  const s = getSnapshot()
-  const bills = s.bills.map((b) => {
-    if (b.id !== billId) return b
-    const nextDue = Math.max(0, Number((b.dueAmount - amount).toFixed(2)))
-    return { ...b, dueAmount: nextDue, status: nextDue === 0 ? "completed" : "due" }
-  })
-  setState({ ...s, bills })
+async function payDue(billId: string, amount: number) {
+  if (!amount || amount <= 0) {
+    alert("Please enter a valid payment amount")
+    return
+  }
+
+  try {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
+    if (!token) {
+      alert("Please login")
+      return
+    }
+
+    const res = await fetch(`/api/billing/${billId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ amount }),
+    })
+
+    if (res.ok) {
+      await fetchBills()
+      alert("Payment updated successfully!")
+    } else {
+      const error = await res.json()
+      alert(error.message || "Failed to update payment")
+    }
+  } catch (err) {
+    console.error("Error updating payment:", err)
+    alert("Failed to update payment. Please try again.")
+  }
+}
+
+// Update bill
+async function updateBill(billId: string, data: { customerName?: string }) {
+  try {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
+    if (!token) {
+      alert("Please login")
+      return
+    }
+
+    const res = await fetch(`/api/billing/${billId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    })
+
+    if (res.ok) {
+      await fetchBills()
+      alert("Bill updated successfully!")
+    } else {
+      const error = await res.json()
+      alert(error.message || "Failed to update bill")
+    }
+  } catch (err) {
+    console.error("Error updating bill:", err)
+    alert("Failed to update bill. Please try again.")
+  }
+}
+
+// Delete bill
+async function deleteBill(billId: string) {
+  try {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
+    if (!token) {
+      alert("Please login")
+      return
+    }
+
+    const res = await fetch(`/api/billing/${billId}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
+    if (res.ok) {
+      await fetchBills()
+      alert("Bill deleted successfully!")
+    } else {
+      const error = await res.json()
+      alert(error.message || "Failed to delete bill")
+    }
+  } catch (err) {
+    console.error("Error deleting bill:", err)
+    alert("Failed to delete bill. Please try again.")
+  }
 }
 
 // export a bills API object as named export used by pages
 export const bills = {
   finalizeCompleted: () => finalize("completed"),
   finalizeDebit: () => finalize("due"),
-  saveDraft,
+  saveBill,
   payDue,
+  fetchBills,
+  updateBill,
+  deleteBill,
 }
 
 export function useStore<T = Store>(selector?: (s: Store) => T) {
@@ -203,10 +430,12 @@ export function useActions() {
   }
   function addItem(p: Product, qty: number) {
     withS((s) => {
-      const existing = s.bill.items.find((i) => i.productId === p.id)
+      // Use _id from backend product
+      const productId = p._id
+      const existing = s.bill.items.find((i) => i.productId === productId)
       const items: LineItem[] = existing
-        ? s.bill.items.map((i) => (i.productId === p.id ? { ...i, qty: i.qty + qty } : i))
-        : [...s.bill.items, { productId: p.id, name: p.name, price: p.price, qty }]
+        ? s.bill.items.map((i) => (i.productId === productId ? { ...i, qty: i.qty + qty } : i))
+        : [...s.bill.items, { productId, name: p.name, price: p.price, qty }]
       setState({ ...s, bill: { ...s.bill, items } })
     })
   }
@@ -228,6 +457,25 @@ export function useActions() {
   function logout() {
     withS((s) => setState({ ...s, loggedIn: false }))
   }
+  function toggleDebit(v: boolean) {
+    withS((s) => setState({ 
+      ...s, 
+      bill: { 
+        ...s.bill, 
+        isDebit: v,
+        debitAmount: v ? null : null // Reset to null when toggling
+      } 
+    }))
+  }
+  function setDebitAmount(amount: number | null) {
+    withS((s) => setState({ 
+      ...s, 
+      bill: { 
+        ...s.bill, 
+        debitAmount: amount 
+      } 
+    }))
+  }
   return {
     setBillName,
     toggleGST,
@@ -239,5 +487,7 @@ export function useActions() {
     logout,
     setItemPrice,
     setItemGst,
+    toggleDebit,
+    setDebitAmount,
   }
 }
