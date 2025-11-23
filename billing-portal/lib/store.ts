@@ -23,8 +23,10 @@ function defaultProducts(): Product[] {
 function defaultBill(): Bill {
   return { 
     id: "bill-1", 
-    name: "Untitled Bill", 
+    name: "", // Buyer name
     vehicleNumber: "",
+    delivery: "",
+    buyerInfo: undefined,
     items: [], 
     gst: false, 
     cgstSgst: false,
@@ -129,7 +131,15 @@ function transformBackendBill(backendBill: any): SavedBill {
   return {
     id: backendBill._id || backendBill.billId, // Keep MongoDB _id for API calls
     billId: backendBill.billId || backendBill._id, // Custom billId for display
-    name: backendBill.customerName || "Customer",
+    name: backendBill.buyerName || backendBill.customerName || "Customer",
+    vehicleNumber: backendBill.vehicleNumber,
+    delivery: backendBill.delivery,
+    buyerInfo: backendBill.buyerName || backendBill.buyerAddress || backendBill.buyerPhone || backendBill.buyerGstNumber ? {
+      name: backendBill.buyerName || backendBill.customerName || "",
+      address: backendBill.buyerAddress || "",
+      phone: backendBill.buyerPhone || "",
+      gstNumber: backendBill.buyerGstNumber || undefined,
+    } : undefined,
     items: backendBill.items.map((item: any) => ({
       productId: typeof item.productId === "object" ? item.productId._id : item.productId,
       name: typeof item.productId === "object" ? item.productId.name : item.name,
@@ -290,8 +300,13 @@ async function saveBill() {
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
-        customerName: s.bill.name || "Customer",
+        customerName: s.bill.buyerInfo?.name || s.bill.name || "Customer",
+        buyerName: s.bill.buyerInfo?.name || s.bill.name || undefined,
+        buyerAddress: s.bill.buyerInfo?.address || undefined,
+        buyerPhone: s.bill.buyerInfo?.phone || undefined,
+        buyerGstNumber: s.bill.buyerInfo?.gstNumber || undefined,
         vehicleNumber: s.bill.vehicleNumber || undefined,
+        delivery: s.bill.delivery || undefined,
         items: backendItems,
         gst: hasGst,
         gstPercent,
@@ -504,12 +519,31 @@ export function useActions() {
       } 
     }))
   }
+  function setDelivery(delivery: string) {
+    withS((s) => setState({ 
+      ...s, 
+      bill: { 
+        ...s.bill, 
+        delivery: delivery || undefined
+      } 
+    }))
+  }
   function toggleCgstSgst(v: boolean) {
     withS((s) => setState({ 
       ...s, 
       bill: { 
         ...s.bill, 
         cgstSgst: v 
+      } 
+    }))
+  }
+  function setBuyerInfo(buyerInfo: { name: string; address: string; phone: string; gstNumber?: string }) {
+    withS((s) => setState({ 
+      ...s, 
+      bill: { 
+        ...s.bill, 
+        name: buyerInfo.name,
+        buyerInfo 
       } 
     }))
   }
@@ -525,8 +559,10 @@ export function useActions() {
     setItemPrice,
     setItemGst,
     toggleDebit,
+    setBuyerInfo,
     setDebitAmount,
     setVehicleNumber,
+    setDelivery,
     toggleCgstSgst,
   }
 }

@@ -39,7 +39,27 @@ const billingSchema = new mongoose.Schema({
     type: String,
     default: "Customer"
   },
+  buyerName: {
+    type: String,
+    required: false
+  },
+  buyerAddress: {
+    type: String,
+    required: false
+  },
+  buyerPhone: {
+    type: String,
+    required: false
+  },
+  buyerGstNumber: {
+    type: String,
+    required: false
+  },
   vehicleNumber: {
+    type: String,
+    required: false
+  },
+  delivery: {
     type: String,
     required: false
   },

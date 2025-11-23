@@ -23,10 +23,27 @@ export type LineItem = {
   hsnCode?: string
 }
 
+export type SellerInfo = {
+  shopName: string
+  gstNumber: string
+  address: string
+  phone: string
+  logo?: string // Optional logo URL or base64
+}
+
+export type BuyerInfo = {
+  name: string
+  address: string
+  phone: string
+  gstNumber?: string // Optional GST number
+}
+
 export type Bill = {
   id: string
-  name: string
+  name: string // Buyer name (changed from bill name)
   vehicleNumber?: string
+  delivery?: string // Delivery details
+  buyerInfo?: BuyerInfo // Buyer information
   items: LineItem[]
   gst: boolean
   cgstSgst: boolean // If true, split GST into CGST and SGST (9% each)
@@ -39,8 +56,10 @@ export type SavedBillStatus = "completed" | "due" | "draft"
 export type SavedBill = {
   id: string // MongoDB _id for API calls
   billId?: string // Custom billId (BLI00001) for display
-  name: string
+  name: string // Buyer name
   vehicleNumber?: string
+  delivery?: string // Delivery details
+  buyerInfo?: BuyerInfo // Buyer information
   items: (LineItem & { gstRate?: number })[]
   total: number
   dueAmount: number

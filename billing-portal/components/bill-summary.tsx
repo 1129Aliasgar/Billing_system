@@ -1,15 +1,29 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, useEffect } from "react"
 import { useActions, useStore } from "../lib/store"
 import { bills as billsApi } from "../lib/store"
 import type { LineItem } from "../lib/types"
 
 export default function BillSummary() {
   const bill = useStore((s: any) => s.bill)
-  const { updateQty, removeItem, toggleGST, setBillName, setVehicleNumber, toggleCgstSgst, clearBill, setItemPrice, setItemGst, toggleDebit, setDebitAmount } = useActions()
+  const { updateQty, removeItem, toggleGST, setBillName, setVehicleNumber, setDelivery, toggleCgstSgst, clearBill, setItemPrice, setItemGst, toggleDebit, setDebitAmount, setBuyerInfo } = useActions()
   const [debitMode, setDebitMode] = useState<"full" | "partial">("full")
   const [partialAmount, setPartialAmount] = useState<string>("")
+  
+  // Initialize buyer info from bill state
+  const [buyerName, setBuyerName] = useState<string>(bill.buyerInfo?.name || bill.name || "")
+  const [buyerAddress, setBuyerAddress] = useState<string>(bill.buyerInfo?.address || "")
+  const [buyerPhone, setBuyerPhone] = useState<string>(bill.buyerInfo?.phone || "")
+  const [buyerGstNumber, setBuyerGstNumber] = useState<string>(bill.buyerInfo?.gstNumber || "")
+  
+  // Update local state when bill changes
+  useEffect(() => {
+    setBuyerName(bill.buyerInfo?.name || bill.name || "")
+    setBuyerAddress(bill.buyerInfo?.address || "")
+    setBuyerPhone(bill.buyerInfo?.phone || "")
+    setBuyerGstNumber(bill.buyerInfo?.gstNumber || "")
+  }, [bill.buyerInfo, bill.name])
 
   const { subTotal, gstAmount, cgstAmount, sgstAmount, grandTotal } = useMemo(() => {
     let sub = 0
@@ -72,28 +86,108 @@ export default function BillSummary() {
   // Check if any item has HSN code
   const hasHsnCode = bill.items.some((i: any) => i.hsnCode)
 
+  // Update buyer info when fields change
+  const handleBuyerInfoChange = () => {
+    if (buyerName) {
+      setBuyerInfo({
+        name: buyerName,
+        address: buyerAddress,
+        phone: buyerPhone,
+        gstNumber: buyerGstNumber || undefined,
+      })
+      setBillName(buyerName)
+    }
+  }
+
   return (
     <div className="bg-white border rounded-lg p-4 grid gap-4">
+      {/* Buyer Information Section */}
+      <div className="border-b pb-4 mb-4">
+        <h3 className="text-sm font-semibold mb-3">Buyer Information</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label htmlFor="buyerName" className="text-sm font-medium block mb-1">
+              Buyer Name *
+            </label>
+            <input
+              id="buyerName"
+              className="h-9 px-3 rounded-md border bg-background w-full"
+              value={buyerName}
+              onChange={(e) => {
+                setBuyerName(e.target.value)
+                setBillName(e.target.value)
+              }}
+              onBlur={handleBuyerInfoChange}
+              placeholder="Enter buyer name"
+            />
+          </div>
+          <div>
+            <label htmlFor="buyerPhone" className="text-sm font-medium block mb-1">
+              Phone Number
+            </label>
+            <input
+              id="buyerPhone"
+              className="h-9 px-3 rounded-md border bg-background w-full"
+              value={buyerPhone}
+              onChange={(e) => setBuyerPhone(e.target.value)}
+              onBlur={handleBuyerInfoChange}
+              placeholder="Enter phone number"
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label htmlFor="buyerAddress" className="text-sm font-medium block mb-1">
+              Address
+            </label>
+            <input
+              id="buyerAddress"
+              className="h-9 px-3 rounded-md border bg-background w-full"
+              value={buyerAddress}
+              onChange={(e) => setBuyerAddress(e.target.value)}
+              onBlur={handleBuyerInfoChange}
+              placeholder="Enter buyer address"
+            />
+          </div>
+          <div>
+            <label htmlFor="buyerGstNumber" className="text-sm font-medium block mb-1">
+              GST Number (Optional)
+            </label>
+            <input
+              id="buyerGstNumber"
+              className="h-9 px-3 rounded-md border bg-background w-full"
+              value={buyerGstNumber}
+              onChange={(e) => setBuyerGstNumber(e.target.value)}
+              onBlur={handleBuyerInfoChange}
+              placeholder="e.g., 27AFLPR6280B1Z9"
+            />
+          </div>
+          <div>
+            <label htmlFor="vehicleNumber" className="text-sm font-medium block mb-1">
+              Vehicle No. (Optional)
+            </label>
+            <input
+              id="vehicleNumber"
+              className="h-9 px-3 rounded-md border bg-background w-full"
+              value={bill.vehicleNumber || ""}
+              onChange={(e) => setVehicleNumber(e.target.value)}
+              placeholder="e.g., MH12AB1234"
+            />
+          </div>
+          <div>
+            <label htmlFor="delivery" className="text-sm font-medium block mb-1">
+              Delivery (Optional)
+            </label>
+            <input
+              id="delivery"
+              className="h-9 px-3 rounded-md border bg-background w-full"
+              value={bill.delivery || ""}
+              onChange={(e) => setDelivery(e.target.value)}
+              placeholder="e.g., GODOWN DELIVERY"
+            />
+          </div>
+        </div>
+      </div>
+
       <div className="flex items-center gap-3 flex-wrap">
-        <label htmlFor="billName" className="text-sm font-medium">
-          Bill Name
-        </label>
-        <input
-          id="billName"
-          className="h-9 px-3 rounded-md border bg-background w-64"
-          value={bill.name}
-          onChange={(e) => setBillName(e.target.value)}
-        />
-        <label htmlFor="vehicleNumber" className="text-sm font-medium">
-          Vehicle No. (Optional)
-        </label>
-        <input
-          id="vehicleNumber"
-          className="h-9 px-3 rounded-md border bg-background w-48"
-          value={bill.vehicleNumber || ""}
-          onChange={(e) => setVehicleNumber(e.target.value)}
-          placeholder="e.g., MH12AB1234"
-        />
         <div className="flex items-center gap-4 ml-auto">
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={bill.gst} onChange={(e) => toggleGST(e.target.checked)} />

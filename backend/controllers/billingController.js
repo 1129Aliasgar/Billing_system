@@ -5,7 +5,7 @@ import Product from "../models/product.js"
 // CREATE Bill
 export const createBill = async (req, res) => {
   try {
-    const { customerName, vehicleNumber, items, gst, gstPercent, cgstSgst, isDebit, userPaid, userDue } = req.body
+    const { customerName, vehicleNumber, delivery, buyerName, buyerAddress, buyerPhone, buyerGstNumber, items, gst, gstPercent, cgstSgst, isDebit, userPaid, userDue } = req.body
 
     // Validate items
     if (!items || !Array.isArray(items) || items.length === 0) {
@@ -61,8 +61,13 @@ export const createBill = async (req, res) => {
 
     // Create bill (this will generate billId via pre-save hook)
     const bill = await Billing.create({
-      customerName: customerName || "Customer",
+      customerName: customerName || buyerName || "Customer",
+      buyerName: buyerName || customerName || undefined,
+      buyerAddress: buyerAddress || undefined,
+      buyerPhone: buyerPhone || undefined,
+      buyerGstNumber: buyerGstNumber || undefined,
       vehicleNumber: vehicleNumber || undefined,
+      delivery: delivery || undefined,
       items,
       billAmount,
       userPaid: finalUserPaid,
@@ -249,16 +254,34 @@ export const getDebitBills = async (req, res) => {
 export const updateBill = async (req, res) => {
   try {
     const { id } = req.params
-    const { customerName } = req.body
+    const { customerName, buyerName, buyerAddress, buyerPhone, buyerGstNumber, vehicleNumber, delivery } = req.body
 
     const bill = await Billing.findById(id)
     if (!bill) {
       return res.status(404).json({ message: "Bill not found" })
     }
 
-    // Update customer name
+    // Update fields
     if (customerName !== undefined) {
       bill.customerName = customerName
+    }
+    if (buyerName !== undefined) {
+      bill.buyerName = buyerName
+    }
+    if (buyerAddress !== undefined) {
+      bill.buyerAddress = buyerAddress
+    }
+    if (buyerPhone !== undefined) {
+      bill.buyerPhone = buyerPhone
+    }
+    if (buyerGstNumber !== undefined) {
+      bill.buyerGstNumber = buyerGstNumber
+    }
+    if (vehicleNumber !== undefined) {
+      bill.vehicleNumber = vehicleNumber
+    }
+    if (delivery !== undefined) {
+      bill.delivery = delivery
     }
 
     await bill.save()
