@@ -8,15 +8,16 @@
     "start": "next start"
   },
   "dependencies": {
+    "jspdf": "^3.0.4",
     "next": "latest",
     "react": "latest",
     "react-dom": "latest"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "latest",
-    "tailwindcss": "latest",
-    "typescript": "latest",
+    "@types/node": "latest",
     "@types/react": "latest",
-    "@types/node": "latest"
+    "tailwindcss": "latest",
+    "typescript": "latest"
   }
 }

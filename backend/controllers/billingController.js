@@ -5,7 +5,7 @@ import Product from "../models/product.js"
 // CREATE Bill
 export const createBill = async (req, res) => {
   try {
-    const { customerName, items, gst, gstPercent, isDebit, userPaid, userDue } = req.body
+    const { customerName, vehicleNumber, items, gst, gstPercent, cgstSgst, isDebit, userPaid, userDue } = req.body
 
     // Validate items
     if (!items || !Array.isArray(items) || items.length === 0) {
@@ -62,12 +62,14 @@ export const createBill = async (req, res) => {
     // Create bill (this will generate billId via pre-save hook)
     const bill = await Billing.create({
       customerName: customerName || "Customer",
+      vehicleNumber: vehicleNumber || undefined,
       items,
       billAmount,
       userPaid: finalUserPaid,
       userDue: finalUserDue,
       gst: gst || false,
       gstPercent: gst ? (gstPercent || 0) : 0,
+      cgstSgst: cgstSgst || false,
       totalAmount,
       isDebit: isDebit || finalUserDue > 0,
       status
@@ -283,15 +285,12 @@ export const deleteBill = async (req, res) => {
       return res.status(404).json({ message: "Bill not found" })
     }
 
-    // Restore stock for items in the bill
-    for (const item of bill.items) {
-      const product = await Product.findById(item.productId)
-      if (product) {
-        product.inStock += item.quantity
-        await product.save()
-      }
+    // Note: We do NOT restore stock when deleting a bill
+    // because the products were already sold and stock was already deducted
+    // Deleting a bill is just removing the record, not reversing the sale
 
-      // Remove sales records for this bill - use bill creation date
+    // Remove sales records for this bill - use bill creation date
+    for (const item of bill.items) {
       const billDate = new Date(bill.createdAt)
       const month = billDate.getMonth() + 1
       const year = billDate.getFullYear()

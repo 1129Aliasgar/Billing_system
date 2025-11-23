@@ -21,7 +21,16 @@ function defaultProducts(): Product[] {
 }
 
 function defaultBill(): Bill {
-  return { id: "bill-1", name: "Untitled Bill", items: [], gst: false, isDebit: false, debitAmount: null }
+  return { 
+    id: "bill-1", 
+    name: "Untitled Bill", 
+    vehicleNumber: "",
+    items: [], 
+    gst: false, 
+    cgstSgst: false,
+    isDebit: false, 
+    debitAmount: null 
+  }
 }
 
 function lsGet<T>(key: string, fallback: T): T {
@@ -127,6 +136,7 @@ function transformBackendBill(backendBill: any): SavedBill {
       price: item.price,
       qty: item.quantity,
       gstRate: item.gstRate || 0,
+      hsnCode: item.hsnCode,
     })),
     total: backendBill.totalAmount,
     dueAmount: backendBill.userDue,
@@ -270,6 +280,7 @@ async function saveBill() {
       price: item.price,
       quantity: item.qty,
       gstRate: item.gstRate || (hasGst ? gstPercent : 0),
+      hsnCode: item.hsnCode,
     }))
 
     const res = await fetch("/api/billing", {
@@ -280,9 +291,11 @@ async function saveBill() {
       },
       body: JSON.stringify({
         customerName: s.bill.name || "Customer",
+        vehicleNumber: s.bill.vehicleNumber || undefined,
         items: backendItems,
         gst: hasGst,
         gstPercent,
+        cgstSgst: s.bill.cgstSgst || false,
         isDebit,
         userPaid, // Send the paid amount
         userDue,  // Send the due amount
@@ -435,7 +448,13 @@ export function useActions() {
       const existing = s.bill.items.find((i) => i.productId === productId)
       const items: LineItem[] = existing
         ? s.bill.items.map((i) => (i.productId === productId ? { ...i, qty: i.qty + qty } : i))
-        : [...s.bill.items, { productId, name: p.name, price: p.price, qty }]
+        : [...s.bill.items, { 
+            productId, 
+            name: p.name, 
+            price: p.price, 
+            qty,
+            hsnCode: (p as any).HSNC_code || undefined
+          }]
       setState({ ...s, bill: { ...s.bill, items } })
     })
   }
@@ -476,6 +495,24 @@ export function useActions() {
       } 
     }))
   }
+  function setVehicleNumber(vehicleNumber: string) {
+    withS((s) => setState({ 
+      ...s, 
+      bill: { 
+        ...s.bill, 
+        vehicleNumber: vehicleNumber || undefined
+      } 
+    }))
+  }
+  function toggleCgstSgst(v: boolean) {
+    withS((s) => setState({ 
+      ...s, 
+      bill: { 
+        ...s.bill, 
+        cgstSgst: v 
+      } 
+    }))
+  }
   return {
     setBillName,
     toggleGST,
@@ -489,5 +526,7 @@ export function useActions() {
     setItemGst,
     toggleDebit,
     setDebitAmount,
+    setVehicleNumber,
+    toggleCgstSgst,
   }
 }

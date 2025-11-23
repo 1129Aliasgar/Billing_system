@@ -22,6 +22,10 @@ const billingItemSchema = new mongoose.Schema({
   gstRate: {
     type: Number,
     default: 0
+  },
+  hsnCode: {
+    type: String,
+    required: false
   }
 }, { _id: false })
 
@@ -34,6 +38,10 @@ const billingSchema = new mongoose.Schema({
   customerName: {
     type: String,
     default: "Customer"
+  },
+  vehicleNumber: {
+    type: String,
+    required: false
   },
   items: {
     type: [billingItemSchema],
@@ -63,6 +71,10 @@ const billingSchema = new mongoose.Schema({
     default: 0,
     min: 0,
     max: 100
+  },
+  cgstSgst: {
+    type: Boolean,
+    default: false
   },
   totalAmount: {
     type: Number,

@@ -7,21 +7,37 @@ import type { LineItem } from "../lib/types"
 
 export default function BillSummary() {
   const bill = useStore((s: any) => s.bill)
-  const { updateQty, removeItem, toggleGST, setBillName, clearBill, setItemPrice, setItemGst, toggleDebit, setDebitAmount } = useActions()
+  const { updateQty, removeItem, toggleGST, setBillName, setVehicleNumber, toggleCgstSgst, clearBill, setItemPrice, setItemGst, toggleDebit, setDebitAmount } = useActions()
   const [debitMode, setDebitMode] = useState<"full" | "partial">("full")
   const [partialAmount, setPartialAmount] = useState<string>("")
 
-  const { subTotal, gstAmount, grandTotal } = useMemo(() => {
+  const { subTotal, gstAmount, cgstAmount, sgstAmount, grandTotal } = useMemo(() => {
     let sub = 0
     let gst = 0
+    let cgst = 0
+    let sgst = 0
+    
     for (const i of bill.items as (LineItem & { gstRate?: number })[]) {
       const line = i.price * i.qty
       sub += line
       const rate = typeof i.gstRate === "number" ? i.gstRate : bill.gst ? 18 : 0
-      gst += (rate / 100) * line
+      const itemGst = (rate / 100) * line
+      gst += itemGst
+      
+      // If CGST/SGST is enabled, split GST equally
+      if (bill.cgstSgst && bill.gst) {
+        cgst += itemGst / 2
+        sgst += itemGst / 2
+      }
     }
     const total = sub + gst
-    return { subTotal: sub, gstAmount: gst, grandTotal: total }
+    return { 
+      subTotal: sub, 
+      gstAmount: gst, 
+      cgstAmount: cgst,
+      sgstAmount: sgst,
+      grandTotal: total 
+    }
   }, [bill])
 
   const handleDebitToggle = (checked: boolean) => {
@@ -53,9 +69,12 @@ export default function BillSummary() {
     }
   }
 
+  // Check if any item has HSN code
+  const hasHsnCode = bill.items.some((i: any) => i.hsnCode)
+
   return (
     <div className="bg-white border rounded-lg p-4 grid gap-4">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <label htmlFor="billName" className="text-sm font-medium">
           Bill Name
         </label>
@@ -65,10 +84,32 @@ export default function BillSummary() {
           value={bill.name}
           onChange={(e) => setBillName(e.target.value)}
         />
-        <label className="flex items-center gap-2 text-sm ml-auto">
-          <input type="checkbox" checked={bill.gst} onChange={(e) => toggleGST(e.target.checked)} />
-          Global GST (18%)
+        <label htmlFor="vehicleNumber" className="text-sm font-medium">
+          Vehicle No. (Optional)
         </label>
+        <input
+          id="vehicleNumber"
+          className="h-9 px-3 rounded-md border bg-background w-48"
+          value={bill.vehicleNumber || ""}
+          onChange={(e) => setVehicleNumber(e.target.value)}
+          placeholder="e.g., MH12AB1234"
+        />
+        <div className="flex items-center gap-4 ml-auto">
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={bill.gst} onChange={(e) => toggleGST(e.target.checked)} />
+            Global GST (18%)
+          </label>
+          {bill.gst && (
+            <label className="flex items-center gap-2 text-sm">
+              <input 
+                type="checkbox" 
+                checked={bill.cgstSgst} 
+                onChange={(e) => toggleCgstSgst(e.target.checked)} 
+              />
+              CGST/SGST (9% each)
+            </label>
+          )}
+        </div>
       </div>
 
       <div className="border rounded-md overflow-hidden">
@@ -76,6 +117,7 @@ export default function BillSummary() {
           <thead className="bg-background">
             <tr>
               <th className="text-left p-2">Product</th>
+              {hasHsnCode && <th className="text-left p-2">HSN Code</th>}
               <th className="text-right p-2">Price</th>
               <th className="text-right p-2">Qty</th>
               <th className="text-right p-2">GST %</th>
@@ -86,7 +128,7 @@ export default function BillSummary() {
           <tbody>
             {bill.items.length === 0 && (
               <tr>
-                <td colSpan={6} className="p-3 text-center text-muted">
+                <td colSpan={hasHsnCode ? 7 : 6} className="p-3 text-center text-muted">
                   No items yet. Add products from above.
                 </td>
               </tr>
@@ -94,6 +136,11 @@ export default function BillSummary() {
             {bill.items.map((i: any) => (
               <tr key={i.productId} className="border-t">
                 <td className="p-2">{i.name}</td>
+                {hasHsnCode && (
+                  <td className="p-2 text-sm text-gray-600">
+                    {i.hsnCode || "-"}
+                  </td>
+                )}
                 <td className="p-2 text-right">
                   <input
                     className="h-8 w-24 px-2 rounded-md border bg-background text-right"
@@ -149,10 +196,23 @@ export default function BillSummary() {
             <span className="">Subtotal</span>
             <span>₹{subTotal.toFixed(2)}</span>
           </div>
-          <div className="flex items-center justify-between">
-            <span className="">GST Total</span>
-            <span>₹{gstAmount.toFixed(2)}</span>
-          </div>
+          {bill.cgstSgst && bill.gst ? (
+            <>
+              <div className="flex items-center justify-between">
+                <span className="">CGST (9%)</span>
+                <span>₹{cgstAmount.toFixed(2)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="">SGST (9%)</span>
+                <span>₹{sgstAmount.toFixed(2)}</span>
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center justify-between">
+              <span className="">GST Total</span>
+              <span>₹{gstAmount.toFixed(2)}</span>
+            </div>
+          )}
           <div className="flex items-center justify-between font-semibold border-t pt-2 mt-2">
             <span>Total</span>
             <span>₹{grandTotal.toFixed(2)}</span>
