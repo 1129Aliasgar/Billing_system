@@ -7,6 +7,7 @@ import Sidebar from "../../components/sidebar"
 
 const nav = [
   { href: "/dashboard/products", label: "Products" },
+  { href: "/dashboard/categories", label: "Categories" },
   { href: "/dashboard/analysis", label: "Analysis" },
   { href: "/dashboard/users", label: "Users" },
 ]

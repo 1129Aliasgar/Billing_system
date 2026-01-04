@@ -10,6 +10,9 @@ export type Product = {
     color?: string[];
     size?: string[];
     brand?: string[];
+    colorvalues?: string[];
+    sizevalues?: string[];
+    brandvalues?: string[];
   };
   ISBillingAvailable: boolean;
 };

@@ -11,7 +11,14 @@ type Product = {
   image: string
   HSNC_code: string
   IsVisible: boolean
+  category?: string
   metadata?: { colorvalues?: string[]; sizevalues?: string[]; brandvalues?: string[] }
+}
+
+type Category = {
+  _id: string
+  name: string
+  displayName: string
 }
 
 export default function ProductDetail() {
@@ -19,9 +26,22 @@ export default function ProductDetail() {
   const router = useRouter()
   const [p, setP] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
+  const [categories, setCategories] = useState<Category[]>([])
   const [colorInput, setColorInput] = useState("")
   const [sizeInput, setSizeInput] = useState("")
   const [brandInput, setBrandInput] = useState("")
+
+  async function fetchCategories() {
+    try {
+      const res = await fetch("/api/categories?activeOnly=true")
+      if (res.ok) {
+        const data = await res.json()
+        setCategories(data.categories || [])
+      }
+    } catch (err) {
+      console.error("Error fetching categories:", err)
+    }
+  }
 
   async function load() {
     setLoading(true)
@@ -37,6 +57,7 @@ export default function ProductDetail() {
 
   useEffect(() => {
     load()
+    fetchCategories()
   }, [id])
 
   async function save() {
@@ -52,6 +73,7 @@ export default function ProductDetail() {
         image: p.image,
         HSN_code: p.HSNC_code,
         IsVisible: p.IsVisible,
+        category: p.category || undefined,
         metadata: p.metadata,
       }),
     })
@@ -134,6 +156,21 @@ export default function ProductDetail() {
         <div>
           <label className="block text-sm mb-1">HSNC Code</label>
           <input className="input" value={p.HSNC_code} onChange={(e) => setP({ ...p, HSNC_code: e.target.value })} />
+        </div>
+        <div>
+          <label className="block text-sm mb-1">Category</label>
+          <select
+            className="input w-full"
+            value={p.category || ""}
+            onChange={(e) => setP({ ...p, category: e.target.value || undefined })}
+          >
+            <option value="">No Category</option>
+            {categories.map((cat) => (
+              <option key={cat._id} value={cat.displayName}>
+                {cat.displayName}
+              </option>
+            ))}
+          </select>
         </div>
         <div>
           <label className="inline-flex items-center gap-2">

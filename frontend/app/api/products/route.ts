@@ -4,7 +4,14 @@ export async function GET(req: NextRequest){
     try {
         const url = new URL(req.url)
         const visibleOnly = url.searchParams.get('visible') === 'true'
-        const backendRes = await fetch(`${process.env.BACKEND_URL}/products/get-products${visibleOnly ? '?visible=true' : ''}`, {
+        const category = url.searchParams.get('category')
+        
+        let queryParams = []
+        if (visibleOnly) queryParams.push('visible=true')
+        if (category) queryParams.push(`category=${encodeURIComponent(category)}`)
+        
+        const queryString = queryParams.length > 0 ? `?${queryParams.join('&')}` : ''
+        const backendRes = await fetch(`${process.env.BACKEND_URL}/products/get-products${queryString}`, {
             method: "GET",
             headers: {
                 "Content-Type": "application/json"

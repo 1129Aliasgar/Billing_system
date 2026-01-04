@@ -39,6 +39,10 @@ const productSchema = new mongoose.Schema({
         type: Boolean ,
         default: false
     },
+    category:{
+        type: String ,
+        default: "General"
+    },
 })
 
 export default mongoose.model("products" , productSchema)

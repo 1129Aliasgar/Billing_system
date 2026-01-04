@@ -2,11 +2,22 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 
-export default function CreateProductModal() {
+type Category = {
+  _id: string
+  name: string
+  displayName: string
+}
+
+type CreateProductModalProps = {
+  onProductCreated?: () => void
+}
+
+export default function CreateProductModal({ onProductCreated }: CreateProductModalProps = {}) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [categories, setCategories] = useState<Category[]>([])
   const [form, setForm] = useState({
     name: "",
     discription: "",
@@ -15,6 +26,7 @@ export default function CreateProductModal() {
     image: "",
     HSNC_code: "",
     IsVisible: true,
+    category: "",
     colorvalues: "",
     sizevalues: "",
     brandvalues: "",
@@ -23,7 +35,25 @@ export default function CreateProductModal() {
   const [sizes, setSizes] = useState<string[]>([])
   const [brands, setBrands] = useState<string[]>([])
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
+  useEffect(() => {
+    if (open) {
+      fetchCategories()
+    }
+  }, [open])
+
+  async function fetchCategories() {
+    try {
+      const res = await fetch("/api/categories?activeOnly=true")
+      if (res.ok) {
+        const data = await res.json()
+        setCategories(data.categories || [])
+      }
+    } catch (err) {
+      console.error("Error fetching categories:", err)
+    }
+  }
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
     const { name, value } = e.target
     setForm((f) => ({ ...f, [name]: value }))
   }
@@ -40,6 +70,7 @@ export default function CreateProductModal() {
         image: form.image,
         HSN_code: form.HSNC_code,
         IsVisible: Boolean(form.IsVisible),
+        category: form.category || undefined,
         metadata: {
           colorvalues: colors.length ? colors : (form.colorvalues ? form.colorvalues.split(",").map((s) => s.trim()).filter(Boolean) : []),
           sizevalues: sizes.length ? sizes : (form.sizevalues ? form.sizevalues.split(",").map((s) => s.trim()).filter(Boolean) : []),
@@ -52,6 +83,10 @@ export default function CreateProductModal() {
         body: JSON.stringify(payload),
       })
       if (!res.ok) throw new Error("Failed to create product")
+      // Refresh product list if callback provided
+      if (onProductCreated) {
+        onProductCreated()
+      }
       setOpen(false)
       setForm({
         name: "",
@@ -61,6 +96,7 @@ export default function CreateProductModal() {
         image: "",
         HSNC_code: "",
         IsVisible: true,
+        category: "",
         colorvalues: "",
         sizevalues: "",
         brandvalues: "",
@@ -138,6 +174,22 @@ export default function CreateProductModal() {
               value={form.HSNC_code}
               onChange={handleChange}
             />
+            <div>
+              <label className="block text-sm mb-1">Category</label>
+              <select
+                name="category"
+                className="h-10 px-3 rounded-md border bg-background w-full"
+                value={form.category}
+                onChange={handleChange}
+              >
+                <option value="">Select Category (Optional)</option>
+                {categories.map((cat) => (
+                  <option key={cat._id} value={cat.displayName}>
+                    {cat.displayName}
+                  </option>
+                ))}
+              </select>
+            </div>
             <label className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"

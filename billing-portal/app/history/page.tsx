@@ -173,7 +173,14 @@ export default function BillHistoryPage() {
                         {editing !== b.id ? (
                           <>
                             <button
-                              onClick={() => generateBillPDF(b)}
+                              onClick={async () => {
+                                try {
+                                  await generateBillPDF(b)
+                                } catch (error) {
+                                  console.error("Error generating PDF:", error)
+                                  alert("Failed to generate PDF. Please try again.")
+                                }
+                              }}
                               className="px-3 py-1.5 text-xs bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-1"
                               title="Download PDF"
                             >

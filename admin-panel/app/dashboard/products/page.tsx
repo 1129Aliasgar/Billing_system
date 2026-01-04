@@ -11,6 +11,7 @@ type Product = {
   price: number
   inStock: number
   IsVisible: boolean
+  category?: string
   image?: string
   HSNC_code?: string
   metadata?: { colorvalues?: string[]; sizevalues?: string[]; brandvalues?: string[] }
@@ -18,6 +19,7 @@ type Product = {
 
 export default function ProductsList() {
   const [q, setQ] = useState("")
+  const [selectedCategory, setSelectedCategory] = useState<string>("All Products")
   const [items, setItems] = useState<Product[]>([])
   const [loading, setLoading] = useState(false)
   const [savingId, setSavingId] = useState<string | null>(null)
@@ -39,9 +41,26 @@ export default function ProductsList() {
     fetchProducts()
   }, [])
 
+  // Get unique categories from products
+  const categories = useMemo(() => {
+    const cats = new Set<string>()
+    items.forEach((p) => {
+      if (p.category) {
+        cats.add(p.category)
+      }
+    })
+    return Array.from(cats).sort()
+  }, [items])
+
   const filtered = useMemo(
-    () => items.filter((p) => p.name.toLowerCase().includes(q.toLowerCase())),
-    [items, q]
+    () => {
+      let result = items.filter((p) => p.name.toLowerCase().includes(q.toLowerCase()))
+      if (selectedCategory !== "All Products") {
+        result = result.filter((p) => p.category === selectedCategory)
+      }
+      return result
+    },
+    [items, q, selectedCategory]
   )
 
   const totalPages = Math.ceil(filtered.length / itemsPerPage)
@@ -88,6 +107,7 @@ export default function ProductsList() {
         image: full.image || "",
         HSN_code: full.HSNC_code || full.HSN_code || "",
         IsVisible: next,
+        category: full.category || undefined,
         metadata: full.metadata || {},
       })
       setItems((prev) => prev.map((p) => (p._id === id ? { ...p, IsVisible: next } : p)))
@@ -109,6 +129,7 @@ export default function ProductsList() {
         image: full.image || "",
         HSN_code: full.HSNC_code || full.HSN_code || "",
         IsVisible: full.IsVisible,
+        category: full.category || undefined,
         metadata: full.metadata || {},
       })
       setItems((prev) => prev.map((p) => (p._id === id ? { ...p, inStock: nextStock } : p)))
@@ -121,25 +142,43 @@ export default function ProductsList() {
     <section className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-semibold">Products</h1>
-        <CreateProductModal />
+        <CreateProductModal onProductCreated={fetchProducts} />
       </div>
-      <input
-        className="input"
-        placeholder="Search by product name..."
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-      />
+      <div className="flex gap-2">
+        <input
+          className="input flex-1"
+          placeholder="Search by product name..."
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        <select
+          className="input"
+          value={selectedCategory}
+          onChange={(e) => {
+            setSelectedCategory(e.target.value)
+            setCurrentPage(1)
+          }}
+        >
+          <option value="All Products">All Products</option>
+          {categories.map((cat) => (
+            <option key={cat} value={cat}>
+              {cat}
+            </option>
+          ))}
+        </select>
+      </div>
       {loading && <div className="text-sm text-gray-500">Loading…</div>}
       <div className="border rounded-lg overflow-hidden">
-        <div className="grid grid-cols-4 bg-[var(--color-muted)] text-sm font-medium p-2">
+        <div className="grid grid-cols-5 bg-[var(--color-muted)] text-sm font-medium p-2">
           <div>Visible</div>
           <div>In Stock</div>
           <div>Save</div>
+          <div>Category</div>
           <div className="text-right pr-2">Product Name</div>
         </div>
         <ul className="divide-y">
           {currentItems.map((p) => (
-            <li key={p._id} className="grid grid-cols-4 items-center p-2 gap-2">
+            <li key={p._id} className="grid grid-cols-5 items-center p-2 gap-2">
               <div>
                 <label className="inline-flex items-center gap-2 text-sm">
                   <input
@@ -167,6 +206,9 @@ export default function ProductsList() {
                 >
                   {savingId === p._id ? "Saving…" : "Save"}
                 </button>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {p.category || "—"}
               </div>
               <div className="text-right">
                 <Link href={`/dashboard/products/${p._id}`} className="text-[var(--color-primary)]">

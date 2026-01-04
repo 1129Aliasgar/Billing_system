@@ -1,26 +1,31 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
 
 const NAV = [
   { href: "/", label: "About" },
   { href: "/products", label: "Products" },
-  { href: "/contact", label: "Contact" },
+  { href: "/contact", label: "Contact Us" },
 ]
 
 export default function Navbar() {
   const pathname = usePathname()
   return (
-    <header className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b">
-      <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
-        <nav className="flex items-center gap-6">
+    <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-border shadow-sm">
+      <div className="max-w-6xl mx-auto px-2 h-16 flex items-center justify-between">
+        <nav className="flex items-center gap-8">
           {NAV.map((item) => {
             const active = pathname === item.href
             return (
               <Link
                 key={item.href}
-                className={`text-sm ${active ? "text-primary font-medium" : "text-foreground"} link-underline`}
+                className={`text-sm font-medium transition-colors ${
+                  active 
+                    ? "text-primary" 
+                    : "text-foreground/70 hover:text-primary"
+                } link-underline`}
                 href={item.href}
               >
                 {item.label}
@@ -28,8 +33,19 @@ export default function Navbar() {
             )
           })}
         </nav>
-        <Link href="/" className="text-lg font-semibold text-foreground" aria-label="E-Store home">
-          E-Store
+        <Link 
+          href="/" 
+          className="flex items-center justify-center h-12 w-12 rounded-full overflow-hidden hover:bg-accent transition-colors"
+          aria-label="Home"
+        >
+          <Image
+            src="/icon.jpg"
+            alt="Company Logo"
+            width={56}
+            height={56}
+            className="rounded-full object-contain"
+            priority
+          />
         </Link>
       </div>
     </header>

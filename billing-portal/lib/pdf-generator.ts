@@ -14,7 +14,24 @@ function addText(doc: jsPDF, text: string, x: number, y: number, options?: any) 
   doc.text(safeText, x, y, options)
 }
 
-export function generateBillPDF(bill: SavedBill) {
+// Helper function to load image as base64
+async function loadImageAsBase64(url: string): Promise<string | null> {
+  try {
+    const response = await fetch(url)
+    const blob = await response.blob()
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onloadend = () => resolve(reader.result as string)
+      reader.onerror = reject
+      reader.readAsDataURL(blob)
+    })
+  } catch (error) {
+    console.error("Error loading image:", error)
+    return null
+  }
+}
+
+export async function generateBillPDF(bill: SavedBill) {
   const doc = new jsPDF()
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()
@@ -28,7 +45,32 @@ export function generateBillPDF(bill: SavedBill) {
   const buyerGstNumber = bill.buyerInfo?.gstNumber
   const isSameState = isMaharashtraGst(buyerGstNumber) // If buyer is from Maharashtra, use CGST/SGST
 
-  // Add logo background (if available) - top left
+  // Add full-cover background image with overlay for readability
+  try {
+    const backgroundImage = await loadImageAsBase64("/icon.jpg")
+    if (backgroundImage) {
+      // Add background image first (full cover)
+      doc.addImage(backgroundImage, "JPEG", 0, 0, pageWidth, pageHeight, undefined, "FAST", 0)
+      
+      // Add semi-transparent white overlay on top for text readability
+      // Using a light white fill with reduced opacity effect
+      doc.setFillColor(255, 255, 255)
+      doc.setGState(doc.GState({ opacity: 0.75 }))
+      doc.rect(0, 0, pageWidth, pageHeight, "F")
+      doc.setGState(doc.GState({ opacity: 1 }))
+    } else {
+      // If image fails to load, use white background
+      doc.setFillColor(255, 255, 255)
+      doc.rect(0, 0, pageWidth, pageHeight, "F")
+    }
+  } catch (error) {
+    // If background fails to load, continue with white background
+    console.warn("Could not load background image:", error)
+    doc.setFillColor(255, 255, 255)
+    doc.rect(0, 0, pageWidth, pageHeight, "F")
+  }
+
+  // Add logo (if available) - top left
   if (sellerInfo.logo) {
     try {
       doc.addImage(sellerInfo.logo, "PNG", margin, yPos, 40, 40)
@@ -109,60 +151,101 @@ export function generateBillPDF(bill: SavedBill) {
   
   yPos += 5
 
-  // Items Table
+  // Items Table - Proper Grid Layout
   const hasHsn = bill.items.some((i) => i.hsnCode)
   
-  // Column widths - adjusted for better fit
-  let colWidths: number[]
   const tableStartX = margin
   const tableEndX = pageWidth - margin
+  const columnGap = 2 // Gap between columns
   
-  if (hasHsn) {
-    // SRNO, DESCRIPTION, HSN/SAC, GST RATE, QTY, RATE, AMOUNT
-    if (hasGst) {
-      colWidths = [8, 48, 24, 17, 20, 28, 33] // Increased QTY from 18 to 20, adjusted others
-    } else {
-      colWidths = [8, 58, 28, 0, 22, 33, 38] // Increased QTY from 20 to 22, adjusted others
-    }
+  // Calculate column positions based on available width
+  // We'll use a percentage-based approach to ensure proper spacing
+  let columnPositions: number[] = []
+  let columnWidths: number[] = []
+  let numColumns = 0
+  
+  if (hasHsn && hasGst) {
+    // 7 columns: SRNO, DESCRIPTION, HSN/SAC, GST RATE, QTY, RATE, AMOUNT
+    numColumns = 7
+    const percentages = [0.05, 0.35, 0.12, 0.08, 0.10, 0.12, 0.18] // Total = 1.0
+    const totalGapWidth = (numColumns - 1) * columnGap
+    const availableWidth = tableEndX - tableStartX - totalGapWidth
+    let currentX = tableStartX
+    percentages.forEach((percent) => {
+      columnPositions.push(currentX)
+      const width = availableWidth * percent
+      columnWidths.push(width)
+      currentX += width + columnGap
+    })
+  } else if (hasHsn && !hasGst) {
+    // 6 columns: SRNO, DESCRIPTION, HSN/SAC, QTY, RATE, AMOUNT
+    numColumns = 6
+    const percentages = [0.05, 0.40, 0.15, 0.12, 0.13, 0.15]
+    const totalGapWidth = (numColumns - 1) * columnGap
+    const availableWidth = tableEndX - tableStartX - totalGapWidth
+    let currentX = tableStartX
+    percentages.forEach((percent) => {
+      columnPositions.push(currentX)
+      const width = availableWidth * percent
+      columnWidths.push(width)
+      currentX += width + columnGap
+    })
+  } else if (!hasHsn && hasGst) {
+    // 6 columns: SRNO, DESCRIPTION, GST RATE, QTY, RATE, AMOUNT
+    numColumns = 6
+    const percentages = [0.05, 0.42, 0.10, 0.12, 0.13, 0.18]
+    const totalGapWidth = (numColumns - 1) * columnGap
+    const availableWidth = tableEndX - tableStartX - totalGapWidth
+    let currentX = tableStartX
+    percentages.forEach((percent) => {
+      columnPositions.push(currentX)
+      const width = availableWidth * percent
+      columnWidths.push(width)
+      currentX += width + columnGap
+    })
   } else {
-    // SRNO, DESCRIPTION, GST RATE, QTY, RATE, AMOUNT (no HSN)
-    if (hasGst) {
-      colWidths = [8, 63, 17, 20, 28, 38] // Increased QTY from 18 to 20, adjusted others
-    } else {
-      colWidths = [8, 78, 0, 22, 33, 43] // Increased QTY from 20 to 22, adjusted others
-    }
+    // 5 columns: SRNO, DESCRIPTION, QTY, RATE, AMOUNT
+    numColumns = 5
+    const percentages = [0.05, 0.50, 0.15, 0.15, 0.15]
+    const totalGapWidth = (numColumns - 1) * columnGap
+    const availableWidth = tableEndX - tableStartX - totalGapWidth
+    let currentX = tableStartX
+    percentages.forEach((percent) => {
+      columnPositions.push(currentX)
+      const width = availableWidth * percent
+      columnWidths.push(width)
+      currentX += width + columnGap
+    })
   }
 
   // Table Header
   doc.setFont("helvetica", "bold")
   doc.setFontSize(7)
-  let xPos = tableStartX
-  doc.text("SRNO", xPos, yPos)
-  xPos += colWidths[0] + 1
+  let colIdx = 0
   
-  doc.text("DESCRIPTION OF GOODS", xPos, yPos)
-  xPos += colWidths[1] + 1
+  doc.text("SRNO", columnPositions[colIdx], yPos)
+  colIdx++
+  
+  doc.text("DESCRIPTION OF GOODS", columnPositions[colIdx], yPos)
+  colIdx++
   
   if (hasHsn) {
-    doc.text("HSN/SAC", xPos, yPos)
-    xPos += colWidths[2] + 1
+    doc.text("HSN/SAC", columnPositions[colIdx], yPos)
+    colIdx++
   }
   
   if (hasGst) {
-    doc.text("GST RATE", xPos, yPos, { align: "right" })
-    xPos += colWidths[hasHsn ? 3 : 2] + 1
+    doc.text("GST RATE", columnPositions[colIdx] + columnWidths[colIdx] - 1, yPos, { align: "right" })
+    colIdx++
   }
   
-  const qtyIndex = hasHsn ? (hasGst ? 4 : 3) : (hasGst ? 3 : 2)
-  doc.text("QTY", xPos, yPos, { align: "right" })
-  xPos += colWidths[qtyIndex] + 1
+  doc.text("QTY", columnPositions[colIdx] + columnWidths[colIdx] - 1, yPos, { align: "right" })
+  colIdx++
   
-  const rateIndex = hasHsn ? (hasGst ? 5 : 4) : (hasGst ? 4 : 3)
-  doc.text("RATE", xPos, yPos, { align: "right" })
-  xPos += colWidths[rateIndex] + 1
+  doc.text("RATE", columnPositions[colIdx] + columnWidths[colIdx] - 1, yPos, { align: "right" })
+  colIdx++
   
-  const amountIndex = hasHsn ? (hasGst ? 6 : 5) : (hasGst ? 5 : 4)
-  doc.text("AMOUNT", xPos, yPos, { align: "right" })
+  doc.text("AMOUNT", columnPositions[colIdx] + columnWidths[colIdx] - 1, yPos, { align: "right" })
   
   yPos += 4
   doc.line(tableStartX, yPos, tableEndX, yPos)
@@ -178,9 +261,34 @@ export function generateBillPDF(bill: SavedBill) {
   let totalSgst = 0
   let totalIgst = 0
 
+  // Cache background image for reuse on multiple pages
+  let cachedBackgroundImage: string | null = null
+  try {
+    cachedBackgroundImage = await loadImageAsBase64("/icon.jpg")
+  } catch (error) {
+    // Continue without background
+  }
+
+  // Helper function to add background to a page
+  const addPageBackground = (doc: jsPDF, bgImage: string | null) => {
+    if (bgImage) {
+      try {
+        doc.addImage(bgImage, "JPEG", 0, 0, pageWidth, pageHeight, undefined, "FAST", 0)
+        doc.setFillColor(255, 255, 255)
+        doc.setGState(doc.GState({ opacity: 0.75 }))
+        doc.rect(0, 0, pageWidth, pageHeight, "F")
+        doc.setGState(doc.GState({ opacity: 1 }))
+      } catch (error) {
+        // Continue without background if it fails
+      }
+    }
+  }
+
   bill.items.forEach((item, index) => {
     if (yPos > pageHeight - 60) {
       doc.addPage()
+      // Add background to new page
+      addPageBackground(doc, cachedBackgroundImage)
       yPos = margin
     }
 
@@ -210,35 +318,40 @@ export function generateBillPDF(bill: SavedBill) {
       }
     }
 
-    xPos = tableStartX
-    doc.text(String(index + 1), xPos, yPos)
-    xPos += colWidths[0] + 1
+    // Use the grid layout for table rows
+    let rowColIdx = 0
     
-    // Truncate product name if too long
-    const productName = item.name.length > 30 ? item.name.substring(0, 27) + "..." : item.name
-    doc.text(productName, xPos, yPos)
-    xPos += colWidths[1] + 1
+    // SRNO
+    doc.text(String(index + 1), columnPositions[rowColIdx], yPos)
+    rowColIdx++
     
+    // DESCRIPTION - Truncate if too long
+    const productName = item.name.length > 35 ? item.name.substring(0, 32) + "..." : item.name
+    doc.text(productName, columnPositions[rowColIdx], yPos, { maxWidth: columnWidths[rowColIdx] })
+    rowColIdx++
+    
+    // HSN/SAC
     if (hasHsn) {
-      doc.text(item.hsnCode || "-", xPos, yPos)
-      xPos += colWidths[2] + 1
+      doc.text(item.hsnCode || "-", columnPositions[rowColIdx], yPos)
+      rowColIdx++
     }
     
+    // GST RATE
     if (hasGst) {
-      doc.text(`${gstRate}%`, xPos, yPos, { align: "right" })
-      xPos += colWidths[hasHsn ? 3 : 2] + 1
+      doc.text(`${gstRate}%`, columnPositions[rowColIdx] + columnWidths[rowColIdx] - 1, yPos, { align: "right" })
+      rowColIdx++
     }
     
-    const qtyIndex = hasHsn ? (hasGst ? 4 : 3) : (hasGst ? 3 : 2)
-    doc.text(String(item.qty), xPos, yPos, { align: "right" })
-    xPos += colWidths[qtyIndex] + 1
+    // QTY
+    doc.text(String(item.qty), columnPositions[rowColIdx] + columnWidths[rowColIdx] - 1, yPos, { align: "right" })
+    rowColIdx++
     
-    const rateIndex = hasHsn ? (hasGst ? 5 : 4) : (hasGst ? 4 : 3)
-    addText(doc, formatNumber(item.price), xPos, yPos, { align: "right" })
-    xPos += colWidths[rateIndex] + 1
+    // RATE
+    addText(doc, formatNumber(item.price), columnPositions[rowColIdx] + columnWidths[rowColIdx] - 1, yPos, { align: "right" })
+    rowColIdx++
     
-    const amountIndex = hasHsn ? (hasGst ? 6 : 5) : (hasGst ? 5 : 4)
-    addText(doc, formatNumber(lineTotal), xPos, yPos, { align: "right" })
+    // AMOUNT
+    addText(doc, formatNumber(lineTotal), columnPositions[rowColIdx] + columnWidths[rowColIdx] - 1, yPos, { align: "right" })
     
     yPos += 4
   })
@@ -300,6 +413,8 @@ export function generateBillPDF(bill: SavedBill) {
   // Signature Area
   if (yPos > pageHeight - 50) {
     doc.addPage()
+    // Add background to new page
+    addPageBackground(doc, cachedBackgroundImage)
     yPos = margin
   }
 

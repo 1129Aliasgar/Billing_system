@@ -11,6 +11,7 @@ export default function BillingPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [productId, setProductId] = useState<string>("")
   const [qty, setQty] = useState<number>(1)
+  const [searchQuery, setSearchQuery] = useState<string>("")
 
   async function fetchBillingProducts() {
     try {
@@ -31,7 +32,7 @@ export default function BillingPage() {
   }, [])
 
   function onAdd() {
-    const p = products.find((x) => x._id === productId)
+    const p = filteredProducts.find((x) => x._id === productId) || products.find((x) => x._id === productId)
     if (p && qty <= p.inStock) {
       addItem(p, qty)
       // Reset quantity after adding
@@ -47,6 +48,34 @@ export default function BillingPage() {
     setQty(Math.min(Math.max(1, newQty), maxQty))
   }
 
+  // Filter products by search query (name or brand)
+  const filteredProducts = products.filter((p) => {
+    if (!searchQuery.trim()) return true
+    const query = searchQuery.toLowerCase()
+    const brandName = p.metadata?.brand?.[0] || p.metadata?.brandvalues?.[0] || ""
+    return (
+      p.name.toLowerCase().includes(query) ||
+      brandName.toLowerCase().includes(query)
+    )
+  })
+
+  // Reset productId if current selection is not in filtered list
+  useEffect(() => {
+    if (productId && !filteredProducts.find(p => p._id === productId)) {
+      if (filteredProducts.length > 0) {
+        setProductId(filteredProducts[0]._id)
+      } else {
+        setProductId("")
+      }
+    }
+  }, [filteredProducts, productId])
+
+  // Get display name with brand
+  function getProductDisplayName(p: Product): string {
+    const brandName = p.metadata?.brand?.[0] || p.metadata?.brandvalues?.[0]
+    return brandName ? `${p.name} (${brandName})` : p.name
+  }
+
   return (
     <AuthGuard>
       <section className="grid gap-4 pb-24">
@@ -55,25 +84,37 @@ export default function BillingPage() {
         {/* Product Selection Section at Top */}
         <div className="bg-white border rounded-lg p-4 grid gap-3">
           <h2 className="text-sm font-medium text-gray-700">Add Products</h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="grid gap-3">
+            {/* Search Bar */}
             <label className="grid gap-1 text-sm">
-              Product
-              <select
+              Search by Product Name or Brand
+              <input
+                type="text"
+                placeholder="Search products or brands..."
                 className="h-10 px-3 rounded-md border bg-background"
-                value={productId}
-                onChange={(e) => setProductId(e.target.value)}
-              >
-                {products.length === 0 ? (
-                  <option value="">No products available</option>
-                ) : (
-                  products.map((p) => (
-                    <option key={p._id} value={p._id}>
-                      {p.name} (Stock: {p.inStock})
-                    </option>
-                  ))
-                )}
-              </select>
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </label>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <label className="grid gap-1 text-sm">
+                Product
+                <select
+                  className="h-10 px-3 rounded-md border bg-background"
+                  value={productId}
+                  onChange={(e) => setProductId(e.target.value)}
+                >
+                  {filteredProducts.length === 0 ? (
+                    <option value="">No products available</option>
+                  ) : (
+                    filteredProducts.map((p) => (
+                      <option key={p._id} value={p._id}>
+                        {getProductDisplayName(p)} (Stock: {p.inStock})
+                      </option>
+                    ))
+                  )}
+                </select>
+              </label>
             <label className="grid gap-1 text-sm">
               Quantity
               <input
@@ -99,6 +140,7 @@ export default function BillingPage() {
                 Available: {products.find(p => p._id === productId)?.inStock || 0}
               </div>
             )}
+            </div>
           </div>
         </div>
 

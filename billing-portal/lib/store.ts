@@ -461,11 +461,14 @@ export function useActions() {
       // Use _id from backend product
       const productId = p._id
       const existing = s.bill.items.find((i) => i.productId === productId)
+      // Format product name with brand if available
+      const brandName = p.metadata?.brand?.[0] || p.metadata?.brandvalues?.[0]
+      const displayName = brandName ? `${p.name} (${brandName})` : p.name
       const items: LineItem[] = existing
         ? s.bill.items.map((i) => (i.productId === productId ? { ...i, qty: i.qty + qty } : i))
         : [...s.bill.items, { 
             productId, 
-            name: p.name, 
+            name: displayName, 
             price: p.price, 
             qty,
             hsnCode: (p as any).HSNC_code || undefined

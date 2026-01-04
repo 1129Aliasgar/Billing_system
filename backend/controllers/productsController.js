@@ -1,9 +1,17 @@
 import Product from "../models/product.js"
+import { getOrCreateCategory } from "./categoryController.js"
 
 // CREATE Product
 export const createProduct = async (req, res) => {
   try {
-    const { name, description, price, inStock, image, HSN_code, metadata , IsVisible , ISBillingAvailable } = req.body;
+    const { name, description, price, inStock, image, HSN_code, metadata , IsVisible , ISBillingAvailable, category } = req.body;
+
+    // Auto-save category if provided
+    let categoryName = category 
+    if (category && category.trim() !== "") {
+      await getOrCreateCategory(category)
+      categoryName = category.trim()
+    }
 
     const product = await Product.create({
       name,
@@ -19,6 +27,7 @@ export const createProduct = async (req, res) => {
       },
       IsVisible,
       ISBillingAvailable,
+      category: categoryName,
     });
 
     if (!product) {
@@ -36,10 +45,12 @@ export const getProducts = async (req, res) => {
   try {
     const onlyVisible = req.query?.visible === 'true'
     const billingOnly = req.query?.billing === 'true'
+    const category = req.query?.category
     
     let filter = {}
     if (onlyVisible) filter.IsVisible = true
     if (billingOnly) filter.ISBillingAvailable = true
+    if (category) filter.category = category
     
     const products = await Product.find(filter);
 
@@ -53,7 +64,14 @@ export const getProducts = async (req, res) => {
 export const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, price, inStock, image, HSN_code, metadata , IsVisible , ISBillingAvailable } = req.body;
+    const { name, description, price, inStock, image, HSN_code, metadata , IsVisible , ISBillingAvailable, category } = req.body;
+
+    // Auto-save category if provided
+    let categoryName = category !== undefined ? category : "General"
+    if (category && category.trim() !== "") {
+      await getOrCreateCategory(category)
+      categoryName = category.trim()
+    }
 
     const product = await Product.findByIdAndUpdate(
       id,
@@ -71,6 +89,7 @@ export const updateProduct = async (req, res) => {
         },
         IsVisible,
         ISBillingAvailable,
+        category: categoryName,
       },
       { new: true, runValidators: true }
     );
