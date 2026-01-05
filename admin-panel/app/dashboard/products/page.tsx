@@ -170,25 +170,19 @@ export default function ProductsList() {
       {loading && <div className="text-sm text-gray-500">Loading…</div>}
       <div className="border rounded-lg overflow-hidden">
         <div className="grid grid-cols-5 bg-[var(--color-muted)] text-sm font-medium p-2">
-          <div>Visible</div>
+          <div className="text-left pl-2">Product Name</div>
           <div>In Stock</div>
           <div>Save</div>
           <div>Category</div>
-          <div className="text-right pr-2">Product Name</div>
+          <div>Visible</div>
         </div>
         <ul className="divide-y">
           {currentItems.map((p) => (
             <li key={p._id} className="grid grid-cols-5 items-center p-2 gap-2">
-              <div>
-                <label className="inline-flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={p.IsVisible}
-                    disabled={savingId === p._id}
-                    onChange={(e) => toggleVisibility(p._id, e.target.checked)}
-                  />
-                  {p.IsVisible ? "Visible" : "Hidden"}
-                </label>
+              <div className="text-left">
+                <Link href={`/dashboard/products/${p._id}`} className="text-[var(--color-primary)]">
+                  {p.name}
+                </Link>
               </div>
               <div>
                 <input
@@ -210,16 +204,22 @@ export default function ProductsList() {
               <div className="text-sm text-muted-foreground">
                 {p.category || "—"}
               </div>
-              <div className="text-right">
-                <Link href={`/dashboard/products/${p._id}`} className="text-[var(--color-primary)]">
-                  {p.name}
-                </Link>
+              <div>
+                <label className="inline-flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={p.IsVisible}
+                    disabled={savingId === p._id}
+                    onChange={(e) => toggleVisibility(p._id, e.target.checked)}
+                  />
+                  {p.IsVisible ? "Visible" : "Hidden"}
+                </label>
               </div>
             </li>
           ))}
         </ul>
       </div>
-      
+
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 mt-4">
           <button
@@ -233,11 +233,10 @@ export default function ProductsList() {
             <button
               key={page}
               onClick={() => goToPage(page)}
-              className={`px-3 py-2 rounded-md ${
-                currentPage === page
+              className={`px-3 py-2 rounded-md ${currentPage === page
                   ? "bg-primary text-white"
                   : "border hover:bg-gray-50"
-              }`}
+                }`}
             >
               {page}
             </button>
@@ -251,7 +250,7 @@ export default function ProductsList() {
           </button>
         </div>
       )}
-      
+
       {/* Modal rendered via CreateProductModal */}
     </section>
   )

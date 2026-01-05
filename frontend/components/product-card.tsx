@@ -31,9 +31,13 @@ export default function ProductCard({ product }: { product: Product }) {
         </p>
 
         <div className="flex items-center justify-between pt-2 border-t">
-          <span className="text-xl font-bold text-primary">
-            ₹{product.price ? product.price.toFixed(2) : "N/A"}
-          </span>
+          {product.metadata?.brand?.[0] || product.metadata?.brandvalues?.[0] ? (
+            <span className="text-sm font-semibold text-primary">
+              {product.metadata?.brand?.[0] || product.metadata?.brandvalues?.[0]}
+            </span>
+          ) : (
+            <span className="text-sm text-muted-foreground">No brand</span>
+          )}
         </div>
       </CardContent>
 

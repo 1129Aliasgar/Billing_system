@@ -51,6 +51,7 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState<boolean>(true)
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState<string>("")
   const itemsPerPage = 12
 
   async function fetchCategories() {
@@ -101,11 +102,29 @@ export default function ProductsPage() {
     fetchProducts()
   }, [selectedCategory])
 
-  // Filter products by category (client-side fallback if backend doesn't support it)
+  // Filter products by category and search query
   const filteredProducts = useMemo(() => {
-    if (!selectedCategory) return products
-    return products.filter((p: any) => p.category === selectedCategory)
-  }, [products, selectedCategory])
+    let filtered = products
+    
+    // Filter by category
+    if (selectedCategory) {
+      filtered = filtered.filter((p: any) => p.category === selectedCategory)
+    }
+    
+    // Filter by search query (product name or brand)
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter((p: any) => {
+        const brandName = p.metadata?.brand?.[0] || p.metadata?.brandvalues?.[0] || ""
+        return (
+          p.name.toLowerCase().includes(query) ||
+          brandName.toLowerCase().includes(query)
+        )
+      })
+    }
+    
+    return filtered
+  }, [products, selectedCategory, searchQuery])
 
   const totalPages = Math.ceil(filteredProducts.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
@@ -162,6 +181,25 @@ export default function ProductsPage() {
         </p>
       </motion.header>
 
+      {/* Search Bar */}
+      <motion.div
+        initial="initial"
+        animate="animate"
+        variants={fadeInUp}
+        className="max-w-2xl"
+      >
+        <input
+          type="text"
+          placeholder="Search by product name or brand..."
+          className="w-full h-12 px-4 rounded-lg border-2 border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors"
+          value={searchQuery}
+          onChange={(e) => {
+            setSearchQuery(e.target.value)
+            setCurrentPage(1) // Reset to first page when search changes
+          }}
+        />
+      </motion.div>
+
       {/* Filter and Products Layout */}
       <div className="grid gap-6 lg:grid-cols-[250px_1fr]">
         {/* Filter Sidebar */}
@@ -213,6 +251,7 @@ export default function ProductsPage() {
                         price: p.price || 0,
                         inStock: p.inStock || 0,
                         image: p.image || "",
+                        metadata: p.metadata,
                       }}
                     />
                   </motion.div>

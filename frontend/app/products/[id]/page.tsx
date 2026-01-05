@@ -7,7 +7,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Package, DollarSign, CheckCircle2 } from "lucide-react"
+import { ArrowLeft } from "lucide-react"
 
 const fadeInUp = {
   initial: { opacity: 0, y: 30 },
@@ -119,18 +119,6 @@ export default function ProductDetails() {
               </p>
             </div>
 
-            {/* Price */}
-            <div className="flex items-center gap-6 py-4 border-y">
-              <div className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5 text-primary" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Price</p>
-                  <p className="text-3xl font-bold text-primary">
-                    ₹{product.price?.toFixed(2) || "0.00"}
-                  </p>
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* Metadata */}
