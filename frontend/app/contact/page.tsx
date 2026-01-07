@@ -33,7 +33,7 @@ export default function ContactPage() {
     e.preventDefault()
     setIsSubmitting(true)
     setStatus("")
-    
+
     try {
       const response = await fetch("/api/contact", {
         method: "POST",
@@ -69,8 +69,7 @@ export default function ContactPage() {
           Contact Us
         </h1>
         <p className="text-lg text-foreground/70 max-w-xl mx-auto">
-          Fill out the form below and we'll get back to you shortly. We're here to help with 
-          all your automotive electrical needs.
+          Available at our store. Contact us for price and availability.
         </p>
       </motion.header>
 
@@ -138,16 +137,15 @@ export default function ContactPage() {
                 >
                   {isSubmitting ? "Sending..." : "Send Message"}
                 </Button>
-                
+
                 {status && (
                   <motion.p
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className={`text-sm text-center px-4 py-2 rounded-md ${
-                      status.includes("Thanks")
+                    className={`text-sm text-center px-4 py-2 rounded-md ${status.includes("Thanks")
                         ? "bg-green-50 text-green-700 border border-green-200"
                         : "bg-red-50 text-red-700 border border-red-200"
-                    }`}
+                      }`}
                   >
                     {status}
                   </motion.p>
